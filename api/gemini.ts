@@ -14,7 +14,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'GEMINI_API_KEY no configurada en Vercel env' });
   }
 
-  const { prompt, model = 'gemini-2.5-flash' } = req.body || {};
+  const { prompt, model = 'gemini-3-flash-preview' } = req.body || {};
   if (!prompt || typeof prompt !== 'string') {
     return res.status(400).json({ error: 'Falta campo prompt (string)' });
   }
