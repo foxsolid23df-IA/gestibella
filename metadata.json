@@ -1,0 +1,6 @@
+{
+  "name": "GestiBella - Software de Gestión para Salones y Spa",
+  "description": "Sistema integral de administración para salones de belleza y spas: gestión multi-sucursal con traspasos automáticos de inventario, exportación oficial de reportes y estados de cuenta a PDF con logotipo, agenda inteligente, punto de venta con ticket en espera, fórmulas técnicas, comisiones y finanzas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
