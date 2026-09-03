@@ -63,7 +63,7 @@ end $$;
 
 -- Trigger enforcement límites (solo starter/pro con límite not null)
 create or replace function public.enforce_tenant_limits() returns trigger language plpgsql as $$
-declare v_max int; v_count int; v_tenant uuid;
+declare v_max int; v_count int; v_tenant uuid; v_plan text;
 begin
   if TG_TABLE_NAME = 'staff' then v_tenant := NEW.tenant_id;
   elsif TG_TABLE_NAME = 'branches' then v_tenant := NEW.tenant_id;
@@ -72,22 +72,22 @@ begin
   end if;
 
   if TG_TABLE_NAME = 'staff' then
-    select max_staff into v_max from public.tenants where id = v_tenant;
+    select max_staff, plan_tier into v_max, v_plan from public.tenants where id = v_tenant;
     if v_max is not null then
       select count(*) into v_count from public.staff where tenant_id = v_tenant;
-      if v_count >= v_max then raise exception 'Límite del plan alcanzado: % staff máximo %', (select plan_tier from tenants where id=v_tenant), v_max; end if;
+      if v_count >= v_max then raise exception 'Limite del plan % alcanzado: % staff maximo', v_plan, v_max; end if;
     end if;
   elsif TG_TABLE_NAME = 'branches' then
-    select max_branches into v_max from public.tenants where id = v_tenant;
+    select max_branches, plan_tier into v_max, v_plan from public.tenants where id = v_tenant;
     if v_max is not null then
       select count(*) into v_count from public.branches where tenant_id = v_tenant;
-      if v_count >= v_max then raise exception 'Límite del plan alcanzado: % sucursales máximo %', (select plan_tier from tenants where id=v_tenant), v_max; end if;
+      if v_count >= v_max then raise exception 'Limite del plan % alcanzado: % sucursales maximo', v_plan, v_max; end if;
     end if;
   elsif TG_TABLE_NAME = 'clients' then
     select max_clients into v_max from public.tenants where id = v_tenant;
     if v_max is not null then
       select count(*) into v_count from public.clients where tenant_id = v_tenant;
-      if v_count >= v_max then raise exception 'Límite del plan starter: % clientes máximo %', v_max; end if;
+      if v_count >= v_max then raise exception 'Limite del plan starter alcanzado: % clientes maximo', v_max; end if;
     end if;
   end if;
   return NEW;
