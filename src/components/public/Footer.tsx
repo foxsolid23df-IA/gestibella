@@ -160,7 +160,7 @@ export const Footer: React.FC = () => {
         </div>
 
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-[#827873] gap-4">
-          <p>© {new Date().getFullYear()} GestiBella Software. Todos los derechos reservados.</p>
+          <p>© {new Date().getFullYear()} GestiBella Software. Todos los derechos reservados. · <a href="/privacidad" className="hover:text-white underline">Aviso de Privacidad</a> · <a href="/terminos" className="hover:text-white underline">Términos</a> · Ticket no fiscal — factura manual 24h</p>
           <p className="flex items-center gap-1">
             Hecho para la industria de la belleza y el bienestar <Heart className="w-3.5 h-3.5 text-[#BE5A38] fill-[#BE5A38]" />
           </p>

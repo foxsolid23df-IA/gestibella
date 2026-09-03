@@ -9,6 +9,8 @@ import { BlogSection } from './components/public/BlogSection';
 import { PricingPlans } from './components/public/PricingPlans';
 import { Footer } from './components/public/Footer';
 import { LoginModal } from './components/public/LoginModal';
+import { Privacy } from './components/public/Privacy';
+import { Terms } from './components/public/Terms';
 
 import { PortalHeader } from './components/portal/PortalHeader';
 import { PortalSidebar } from './components/portal/PortalSidebar';
@@ -32,21 +34,51 @@ import { SwitchProfileModal } from './components/portal/SwitchProfileModal';
 import { AdminPanel } from './components/admin/AdminPanel';
 import { useTenant } from './lib/tenantContext';
 
+const AdminRouteGuard: React.FC = () => {
+  const [checking, setChecking] = React.useState(true);
+  const [isAllowed, setIsAllowed] = React.useState(false);
+  React.useEffect(()=>{
+    (async()=>{
+      const { supabase, isSupabaseConfigured } = await import('./lib/supabaseClient');
+      if (!isSupabaseConfigured || !supabase) { setIsAllowed(true); setChecking(false); return; } // demo: permite
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { setIsAllowed(false); setChecking(false); return; }
+      const { data } = await supabase.from('platform_admins').select('user_id').eq('user_id', session.user.id).maybeSingle();
+      setIsAllowed(!!data);
+      setChecking(false);
+    })();
+  },[]);
+  if (checking) return <div className="p-8 text-center text-sm">Verificando acceso super-admin…</div>;
+  if (!isAllowed) return (
+    <div className="min-h-screen bg-[#FAF7F2] flex items-center justify-center p-6">
+      <div className="bg-white border border-[#E8DFD8] rounded-2xl p-6 max-w-md text-center space-y-3">
+        <h2 className="font-bold">Acceso restringido — Solo super-admin</h2>
+        <p className="text-xs text-[#78716C]">Inicia sesión con tu cuenta de super-admin para acceder a /admin. Si es demo local, este guard está deshabilitado.</p>
+        <a href="/" className="inline-block px-4 py-2 bg-[#1C1917] text-white rounded-xl text-xs font-bold">Volver al sitio</a>
+      </div>
+    </div>
+  );
+  return (
+    <div className="min-h-screen bg-[#FAF7F2] text-[#1C1917] font-sans antialiased">
+      <div className="bg-[#1C1917] text-white px-4 py-2 text-xs flex items-center justify-between">
+        <span className="font-bold tracking-wide">GESTIBELLA · SUPER-ADMIN</span>
+        <a href="/" className="text-[#D8C3B5] hover:text-white text-xs">← Volver al sitio</a>
+      </div>
+      <div className="py-6"><AdminPanel /></div>
+    </div>
+  );
+};
+
 const MainContent: React.FC = () => {
   const { isPortalOpen, portalModule } = useSalon();
   const { isExpired, daysRemaining, tenant } = useTenant();
   const isAdminRoute = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
   if (isAdminRoute) {
-    return (
-      <div className="min-h-screen bg-[#FAF7F2] text-[#1C1917] font-sans antialiased">
-        <div className="bg-[#1C1917] text-white px-4 py-2 text-xs flex items-center justify-between">
-          <span className="font-bold tracking-wide">GESTIBELLA · SUPER-ADMIN</span>
-          <a href="/" className="text-[#D8C3B5] hover:text-white text-xs">← Volver al sitio</a>
-        </div>
-        <div className="py-6"><AdminPanel /></div>
-      </div>
-    );
+    return <AdminRouteGuard />;
   }
+  const path = typeof window !== 'undefined' ? window.location.pathname : '/';
+  if (path === '/privacidad') return <div className="min-h-screen bg-[#FAF7F2]"><Privacy /><Footer /></div>;
+  if (path === '/terminos') return <div className="min-h-screen bg-[#FAF7F2]"><Terms /><Footer /></div>;
 
   if (isPortalOpen) {
     return (

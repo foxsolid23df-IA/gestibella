@@ -62,8 +62,9 @@ export const ReceiptModal: React.FC = () => {
             <p className="text-[10px] text-[#78716C] font-sans">
               {receiptConfig.address}<br />
               Tel: {receiptConfig.phone}
-              {receiptConfig.showTaxId && receiptConfig.taxId && <><br />RFC: {receiptConfig.taxId}</>}
+              {receiptConfig.showTaxId && receiptConfig.taxId && <><br />RFC ref: {receiptConfig.taxId} <span className="text-[8px]">(no fiscal)</span></>}
             </p>
+            <p className="text-[8px] font-bold tracking-widest text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-1 font-sans">TICKET NO FISCAL — SIN VALIDEZ SAT · Factura manual 24h por WhatsApp</p>
           </div>
 
           {/* Ticket metadata */}
@@ -168,6 +169,7 @@ export const ReceiptModal: React.FC = () => {
             <p className="text-[10px] text-[#78716C] font-sans italic">
               {receiptConfig.customFooterMessage}
             </p>
+            <p className="text-[8px] text-[#A8A29E] font-sans">Este comprobante no es CFDI. Solicita tu factura manual en 24h.</p>
           </div>
 
         </div>

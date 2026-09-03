@@ -124,8 +124,12 @@ function drawHeader(
   const rightX = pageWidth - 16;
   doc.setTextColor(68, 64, 60);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.text(`RFC: ${receiptConfig.taxId || 'GBE240824-XYZ'}`, rightX, 19, { align: 'right' });
+  doc.setFontSize(7);
+  doc.text(`Ticket no fiscal — sin validez SAT`, rightX, 16, { align: 'right' });
+  doc.setFontSize(7);
+  doc.setTextColor(120, 113, 108);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`RFC ref: ${receiptConfig.taxId || 'GBE240824-XYZ'}`, rightX, 19, { align: 'right' });
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
@@ -164,14 +168,14 @@ function drawFooter(doc: jsPDF, options: CommonPdfOptions) {
     doc.setDrawColor(232, 223, 216);
     doc.line(10, pageHeight - 14, pageWidth - 10, pageHeight - 14);
 
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.setTextColor(120, 113, 108);
-    doc.text(
-      `GestiBella Pro • Software de Gestión para Salones y Spas • Generado por: ${options.generatedBy || 'Gerencia General'}`,
-      12,
-      pageHeight - 9
-    );
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6);
+  doc.setTextColor(120, 113, 108);
+  doc.text(
+    `Ticket no fiscal — sin validez SAT. Solicita factura manual 24h por WhatsApp. • GestiBella • Generado por: ${options.generatedBy || 'Gerencia General'}`,
+    12,
+    pageHeight - 9
+  );
 
     doc.text(
       `Página ${i} de ${pageCount}`,

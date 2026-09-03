@@ -17,8 +17,10 @@ port = 54323
 [auth]
 enabled = true
 site_url = "http://localhost:3000"
-additional_redirect_urls = ["http://localhost:3000"]
+additional_redirect_urls = ["http://localhost:3000", "https://slpwotimpftumhvepbgi.supabase.co"]
 jwt_expiry = 3600
 enable_signup = true
-enable_confirmations = false
+enable_confirmations = true
 enable_manual_linking = true
+# Hook para inyectar tenant_id en JWT (activar en dashboard → Auth → Hooks → Custom Access Token)
+# custom_access_token_hook = "public.custom_access_token_hook"

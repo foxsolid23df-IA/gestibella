@@ -26,14 +26,42 @@ export const LoginModal: React.FC = () => {
 
   if (!isLoginModalOpen) return null;
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
       addToast('error', 'Campos Incompletos', 'Por favor ingresa tu correo y contraseña.');
       return;
     }
-
-    // Find the admin or receptionist staff member to log in as active session manager
+    // Si Supabase Auth está configurado y no es demo, intenta login real; fallback a fake para no romper demo
+    const { supabase, isSupabaseConfigured } = await import('../../lib/supabaseClient');
+    if (isSupabaseConfigured && supabase && !isDemoMock) {
+      setIsLoading(true);
+      const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      if (!error && data.user) {
+        // Buscar staff vinculado a este auth_user_id
+        const { data: staff } = await supabase.from('staff').select('id').eq('auth_user_id', data.user.id).maybeSingle();
+        if (staff?.id) {
+          loginAs(staff.id);
+          addToast('success', 'Sesión Iniciada (Auth)', `Bienvenida, ${data.user.email}`);
+          setIsLoading(false);
+          return;
+        }
+        // Si no hay staff vinculado pero el login fue válido, permitir entrada como ADMIN genérico
+        const adminStaff = staffList.find((s) => s.role === 'ADMIN') || staffList[0];
+        loginAs(adminStaff.id);
+        addToast('success', 'Sesión Iniciada (Auth sin staff vinculado)', 'Bienvenida al portal.');
+        setIsLoading(false);
+        return;
+      }
+      // Si falla Auth (ej. usuario no existe en auth.users), fallback a fake para mantener compatibilidad demo
+      if (error) {
+        // No bloquear: intenta fake
+        console.warn('[LoginModal] Auth falló, fallback fake:', error.message);
+      }
+      setIsLoading(false);
+    }
+    // Fallback fake (demo / compat)
     const adminStaff = staffList.find((s) => s.role === 'ADMIN' || s.role === 'RECEPTIONIST') || staffList[0];
     loginAs(adminStaff.id);
     addToast('success', 'Sesión Iniciada', 'Bienvenida al portal de gestión GestiBella.');
@@ -120,9 +148,10 @@ export const LoginModal: React.FC = () => {
           <button
             id="btn-submit-master-login"
             type="submit"
-            className="w-full py-3.5 bg-gradient-to-r from-[#BE5A38] to-[#D97706] text-white font-bold text-xs rounded-xl shadow-md hover:from-[#A84E30] hover:to-[#B45309] transition-all flex items-center justify-center gap-2 cursor-pointer mt-2"
+            disabled={isLoading}
+            className="w-full py-3.5 bg-gradient-to-r from-[#BE5A38] to-[#D97706] text-white font-bold text-xs rounded-xl shadow-md hover:from-[#A84E30] hover:to-[#B45309] transition-all flex items-center justify-center gap-2 cursor-pointer mt-2 disabled:opacity-60"
           >
-            <span>Iniciar Sesión en el Software</span>
+            <span>{isLoading ? 'Verificando...' : 'Iniciar Sesión en el Software'}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>

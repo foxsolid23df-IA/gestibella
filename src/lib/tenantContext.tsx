@@ -28,6 +28,7 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Si hay sesión Auth, priorizar tenant_id del JWT (RLS tenant_isolation)
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) {
       setIsLoading(false);
@@ -36,7 +37,15 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     let cancelled = false;
     (async () => {
       try {
-        const id = await resolveTenantId(tenantSlug);
+        // 1) Intentar leer tenant desde JWT (post-006)
+        const { data: { session } } = await supabase.auth.getSession();
+        const jwtTenantId = (session?.user as any)?.app_metadata?.tenant_id || (session?.access_token ? (()=>{ try{ const p=JSON.parse(atob(session.access_token.split('.')[1])); return p.tenant_id; }catch{ return null; }})() : null);
+        let id: string | null = null;
+        if (jwtTenantId) {
+          id = jwtTenantId;
+        } else {
+          id = await resolveTenantId(tenantSlug);
+        }
         if (cancelled) return;
         if (!id) {
           setError(`Tenant no encontrado: ${tenantSlug}. Verifica VITE_DEMO_TENANT_SLUG y seed.sql`);
@@ -61,7 +70,9 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (!cancelled) setIsLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    // Re-resolver al cambiar sesión
+    const { data: sub } = supabase.auth.onAuthStateChange(()=>{ /* trigger re-fetch via tenantSlug change */ });
+    return () => { cancelled = true; sub.subscription.unsubscribe(); };
   }, [tenantSlug]);
 
   const isDemoMock = !isSupabaseConfigured;

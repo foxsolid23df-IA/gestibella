@@ -4,9 +4,26 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 // Vercel Hobby: maxDuration 10s (vercel.json)
 // Env: GEMINI_API_KEY (sin prefijo VITE, solo server)
 
+const rateMap = new Map<string, { count: number; reset: number }>();
+function checkRateLimit(ip: string, limit = 10, windowMs = 60000): boolean {
+  const now = Date.now();
+  const entry = rateMap.get(ip);
+  if (!entry || now > entry.reset) {
+    rateMap.set(ip, { count: 1, reset: now + windowMs });
+    return true;
+  }
+  if (entry.count >= limit) return false;
+  entry.count++;
+  return true;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed, use POST' });
+  }
+  const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || (req.headers['x-real-ip'] as string) || 'unknown';
+  if (!checkRateLimit(ip, 10, 60000)) {
+    return res.status(429).json({ error: 'Rate limit: máximo 10 req/min por IP' });
   }
 
   const apiKey = process.env.GEMINI_API_KEY;
@@ -25,7 +42,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const ai = new GoogleGenAI({ apiKey });
     const result = await ai.models.generateContent({ model, contents: prompt });
     const text = (result as any).text || (result as any).candidates?.[0]?.content?.parts?.[0]?.text || '';
-    return res.status(200).json({ text, raw: result });
+    return res.status(200).json({ text });
   } catch (e: any) {
     return res.status(500).json({ error: e.message || 'Gemini proxy failed', detail: String(e) });
   }
