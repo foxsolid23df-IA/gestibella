@@ -89,31 +89,33 @@ export const AdminPanel: React.FC = () => {
   if (isDemoMock) {
     const url = (import.meta as any).env?.VITE_SUPABASE_URL as string | undefined;
     const anon = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY as string | undefined;
+    const [serverEnv, setServerEnv] = React.useState<any>(null);
+    React.useEffect(()=>{ fetch('/api/debug-env').then(r=>r.json()).then(setServerEnv).catch(()=>{}); },[]);
     return (
       <div className="max-w-3xl mx-auto p-6 bg-amber-50 border border-amber-200 rounded-2xl text-sm text-amber-900 space-y-3">
-        <div className="flex items-center gap-2 font-bold"><AlertTriangle className="w-5 h-5"/> Modo DEMO local — Supabase no conectado</div>
+        <div className="flex items-center gap-2 font-bold"><AlertTriangle className="w-5 h-5"/> Modo DEMO — Supabase no conectado en el CLIENTE (Vite)</div>
         <div className="bg-white border border-amber-200 rounded-xl p-3 font-mono text-xs space-y-1">
-          <div>VITE_SUPABASE_URL: <span className={url ? 'text-emerald-700 font-bold' : 'text-rose-600 font-bold'}>{url ? url.slice(0,45)+'...' : '❌ VACÍO (no cargado)'}</span></div>
-          <div>VITE_SUPABASE_ANON_KEY: <span className={anon ? 'text-emerald-700 font-bold' : 'text-rose-600 font-bold'}>{anon ? anon.slice(0,20)+'... ('+anon.length+' chars)' : '❌ VACÍO'}</span></div>
-          <div>isSupabaseConfigured: <span className="font-bold">{String(!isDemoMock)}</span> → {isDemoMock ? 'false = DEMO' : 'true = conectado'}</div>
+          <div>CLIENT (Vite build) VITE_SUPABASE_URL: <span className={url ? 'text-emerald-700 font-bold' : 'text-rose-600 font-bold'}>{url ? url.slice(0,45)+'...' : '❌ VACÍO (no inlinado en build)'}</span></div>
+          <div>CLIENT VITE_SUPABASE_ANON_KEY: <span className={anon ? 'text-emerald-700 font-bold' : 'text-rose-600 font-bold'}>{anon ? anon.slice(0,20)+'... ('+anon.length+' chars)' : '❌ VACÍO'}</span></div>
+          <div>SERVER (Vercel Function) /api/debug-env: <span className="font-bold">{serverEnv ? JSON.stringify(serverEnv.rawPresence) : 'cargando...'}</span></div>
+          {serverEnv && <div className="text-[11px]">Server URL: {serverEnv.env.VITE_SUPABASE_URL || 'null'} | Anon: {serverEnv.env.VITE_SUPABASE_ANON_KEY || 'null'}</div>}
+          {serverEnv && <div className="text-[11px] bg-amber-50 border border-amber-200 rounded p-2 mt-1">{serverEnv.hint}</div>}
         </div>
-        <div className="space-y-2">
-          <p className="font-bold">Si estás en LOCAL (npm run dev):</p>
-          <ol className="list-decimal ml-5 space-y-1 text-xs">
-            <li>Verifica <code>.env.local</code> tiene <code>VITE_SUPABASE_URL</code> y <code>VITE_SUPABASE_ANON_KEY</code> sin espacios extra.</li>
-            <li><b>Reinicia el servidor:</b> detén <code>npm run dev</code> (Ctrl+C) y ejecútalo de nuevo. Vite solo lee <code>.env.*</code> al arrancar.</li>
-            <li>Recarga <code>/admin</code> con Ctrl+Shift+R.</li>
+        <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-xs space-y-2">
+          <p className="font-bold text-rose-800">🔴 Estás en este estado porque Vercel hizo el build SIN las env vars en scope Production.</p>
+          <p>Aunque veas las variables en Settings → Environment Variables, Vercel las separa por <b>Environment: Production / Preview / Development</b>. Si las añadiste solo para Preview, el build de producción sale VACÍO.</p>
+          <ol className="list-decimal ml-5 space-y-1 font-mono text-[11px]">
+            <li>Vercel → gestibella → Settings → Environment Variables → revisa cada variable → columna <b>Environment</b> debe tener ✅ <b>Production</b> (edita y marca Production + Preview + Development).</li>
+            <li>Deployments → último deployment (61bdb79) → ⋯ → <b>Redeploy</b> → desmarca <b>Use existing Build Cache</b> → Redeploy.</li>
+            <li>Verifica: abre <code>/api/debug-env</code> en el navegador — debe mostrar <code>has_VITE_SUPABASE_URL: true</code>.</li>
+            <li>Luego recarga <code>/admin</code> — debe mostrar tabla, no este cartel.</li>
           </ol>
-          <p className="font-bold mt-3">Si estás en VERCEL:</p>
-          <ol className="list-decimal ml-5 space-y-1 text-xs">
-            <li>Vercel Dashboard → tu proyecto → Settings → Environment Variables → añade:<br/><code>VITE_SUPABASE_URL=https://slpwotimpftumhvepbgi.supabase.co</code><br/><code>VITE_SUPABASE_ANON_KEY=sb_publishable_...</code><br/><code>VITE_DEMO_TENANT_SLUG=gestibella-demo</code></li>
-            <li>Deployments → Redeploy (o push nuevo commit ya hecho <code>a188eb6</code>).</li>
-            <li>Verifica que el SQL <code>005_licenses.sql</code> ya se ejecutó en Supabase SQL Editor (lo hiciste ✅).</li>
-          </ol>
+          <p className="text-[11px]">SQL 005 ya está OK (lo hiciste ✅). Solo falta que Vite lo inlinee en el build.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button onClick={()=>window.location.reload()} className="px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-bold">Recargar</button>
-          <button onClick={()=>{ (window as any).__debugSupabase = {url, anonLen: anon?.length, isDemoMock}; console.log('Supabase debug', (window as any).__debugSupabase); alert('Revisa consola (F12) para debug'); }} className="px-3 py-1.5 bg-white border border-amber-300 rounded-lg text-xs font-bold">Debug consola</button>
+          <a href="/api/debug-env" target="_blank" className="px-3 py-1.5 bg-white border border-amber-300 rounded-lg text-xs font-bold">Abrir /api/debug-env</a>
+          <button onClick={()=>{ (window as any).__debugSupabase = {url, anonLen: anon?.length, isDemoMock, serverEnv}; console.log('Supabase debug', (window as any).__debugSupabase); alert('Revisa consola F12'); }} className="px-3 py-1.5 bg-white border border-amber-300 rounded-lg text-xs font-bold">Debug consola</button>
         </div>
       </div>
     );
