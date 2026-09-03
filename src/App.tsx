@@ -29,13 +29,33 @@ import { ArchitectureDocsModule } from './components/portal/ArchitectureDocsModu
 import { CheckoutModal } from './components/portal/CheckoutModal';
 import { ReceiptModal } from './components/portal/ReceiptModal';
 import { SwitchProfileModal } from './components/portal/SwitchProfileModal';
+import { AdminPanel } from './components/admin/AdminPanel';
+import { useTenant } from './lib/tenantContext';
 
 const MainContent: React.FC = () => {
   const { isPortalOpen, portalModule } = useSalon();
+  const { isExpired, daysRemaining, tenant } = useTenant();
+  const isAdminRoute = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
+  if (isAdminRoute) {
+    return (
+      <div className="min-h-screen bg-[#FAF7F2] text-[#1C1917] font-sans antialiased">
+        <div className="bg-[#1C1917] text-white px-4 py-2 text-xs flex items-center justify-between">
+          <span className="font-bold tracking-wide">GESTIBELLA · SUPER-ADMIN</span>
+          <a href="/" className="text-[#D8C3B5] hover:text-white text-xs">← Volver al sitio</a>
+        </div>
+        <div className="py-6"><AdminPanel /></div>
+      </div>
+    );
+  }
 
   if (isPortalOpen) {
     return (
       <div className="min-h-screen bg-[#FAF7F2] flex flex-col text-[#1C1917] font-sans antialiased">
+        {isExpired && (
+          <div className="bg-rose-600 text-white text-center py-2 text-xs font-bold tracking-wide">
+            ⚠️ Licencia vencida ({tenant?.plan_tier}) — vence {tenant?.current_period_end ? new Date(tenant.current_period_end).toLocaleDateString() : '—'} · Contacta al administrador para renovar · Solo lectura
+          </div>
+        )}
         {/* Portal Internal Header */}
         <PortalHeader />
 

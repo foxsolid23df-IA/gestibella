@@ -101,7 +101,7 @@ async function sbRpcTransfer(tenantId:string, source:string, dest:string, produc
 }
 
 export const SalonProvider: React.FC<{children:React.ReactNode}> = ({ children }) => {
-  const { tenantId, isLoading: isTenantLoading } = useTenant();
+  const { tenantId, isLoading: isTenantLoading, limits, isExpired, tenant } = useTenant();
   const qc = useQueryClient();
   const isSupabaseEnabled = isSupabaseConfigured && !!tenantId;
 
@@ -209,6 +209,11 @@ export const SalonProvider: React.FC<{children:React.ReactNode}> = ({ children }
   const logout = ()=>{ setIsPortalOpen(false); addToast('info','Sesión Finalizada','Has salido del portal exclusivo del salón.'); };
 
   const addStaffMember = (data:Omit<StaffMember,'id'>)=>{
+    if (limits.maxStaff !== null && staffList.length >= limits.maxStaff) {
+      addToast('error','Límite del plan alcanzado',`Plan ${tenant?.plan_tier ?? ''} permite máximo ${limits.maxStaff} colaboradores. Actualiza a ${tenant?.plan_tier==='starter'?'Pro':'Elite'} para añadir más.`);
+      return;
+    }
+    if (isExpired) { addToast('error','Licencia vencida','Renueva tu licencia para añadir personal.'); return; }
     const newId = `staff-${Date.now()}`;
     const newStaff:StaffMember = { ...data, id:newId, permissions: data.permissions||{ canAccessPOS:true, canAccessFinances:data.role==='ADMIN', canAccessInventory:true, canAccessReports:data.role==='ADMIN'||data.role==='MANAGER', canManageStaff:data.role==='ADMIN' } };
     setStaffList(prev=>[...prev,newStaff]);
@@ -239,6 +244,7 @@ export const SalonProvider: React.FC<{children:React.ReactNode}> = ({ children }
 
   // Business actions — local + supabase persist
   const addAppointment = (newAptData:Omit<Appointment,'id'>)=>{
+    if (isExpired) { addToast('error','Licencia vencida','Renueva tu licencia para agendar citas.'); return; }
     const id=`apt-${Date.now()}`;
     let depositRequired=newAptData.depositRequired??false;
     let depositAmount=newAptData.depositAmount;
@@ -372,6 +378,7 @@ export const SalonProvider: React.FC<{children:React.ReactNode}> = ({ children }
     return branchId==='branch-1'?item.currentStock:0;
   };
   const transferProductBetweenBranches=async({sourceBranchId,destinationBranchId,productId,quantity,notes,authorizedBy}:{sourceBranchId:string;destinationBranchId:string;productId:string;quantity:number;notes?:string;authorizedBy?:string;}):Promise<boolean>=>{
+    if (isExpired) { addToast('error','Licencia vencida','Renueva tu licencia para hacer traspasos.'); return false; }
     if(sourceBranchId===destinationBranchId){ addToast('error','Traspaso Inválido','Origen y destino no pueden ser la misma.'); return false; }
     if(quantity<=0){ addToast('error','Cantidad Inválida','Debe ser >0.'); return false; }
     const product=inventoryList.find(i=>i.id===productId); if(!product){ addToast('error','Producto No Encontrado','No existe.'); return false; }
@@ -414,6 +421,11 @@ export const SalonProvider: React.FC<{children:React.ReactNode}> = ({ children }
     addToast('success','Fórmula Técnica Guardada',`Receta archivada para ${formulaData.clientName}.`);
   };
   const addClient=(clientData:Omit<ClientProfile,'id'|'totalSpent'|'visitCount'|'loyaltyPoints'|'stampCardCount'|'activePackages'|'joinedDate'>)=>{
+    if (limits.maxClients !== null && clientsList.length >= limits.maxClients) {
+      addToast('error','Límite del plan alcanzado',`Plan Starter limitado a ${limits.maxClients} clientes. Actualiza a Pro para clientes ilimitados.`);
+      return;
+    }
+    if (isExpired) { addToast('error','Licencia vencida','Renueva tu licencia para registrar clientes.'); return; }
     const newClient:ClientProfile={...clientData,id:`cli-${Date.now()}`,joinedDate:new Date().toISOString().split('T')[0],totalSpent:0,visitCount:0,loyaltyPoints:50,stampCardCount:0,activePackages:[]};
     setClientsList(prev=>[newClient,...prev]);
     if(isSupabaseEnabled) sbInsert('clients',{id:newClient.id, name:newClient.name, phone:newClient.phone, email:newClient.email, avatar:newClient.avatar, loyalty_points:50}, tenantId);

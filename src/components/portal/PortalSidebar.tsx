@@ -19,6 +19,7 @@ import {
   Building2
 } from 'lucide-react';
 import { useSalon, PortalNavModule } from '../../context/SalonContext';
+import { useTenant } from '../../lib/tenantContext';
 
 export const PortalSidebar: React.FC = () => {
   const {
@@ -30,18 +31,22 @@ export const PortalSidebar: React.FC = () => {
     waitlistEntries,
     resetToDemoData
   } = useSalon();
+  const { tenant, limits } = useTenant();
 
   const openHoldCount = ticketsList.filter((t) => t.status === 'HOLD').length;
   const inChairAptCount = appointmentsList.filter((a) => a.status === 'IN_CHAIR').length;
   const lowStockCount = inventoryList.filter((i) => i.currentStock <= i.minStock).length;
   const activeWaitlistCount = waitlistEntries.filter((w) => w.status === 'WAITING').length;
 
+  const isStarter = tenant?.plan_tier === 'starter';
   const menuItems: {
     id: PortalNavModule;
     label: string;
     icon: React.ElementType;
     badge?: number | string;
     badgeColor?: string;
+    locked?: boolean;
+    lockReason?: string;
   }[] = [
     {
       id: 'DASHBOARD',
@@ -110,8 +115,10 @@ export const PortalSidebar: React.FC = () => {
       id: 'MULTI_BRANCH',
       label: 'Multi-Sucursal & Red',
       icon: Building2,
-      badge: 'Pro',
-      badgeColor: 'bg-[#BE5A38]/10 text-[#BE5A38]'
+      badge: isStarter ? 'Solo Pro/Elite' : 'Pro',
+      badgeColor: isStarter ? 'bg-amber-100 text-amber-800' : 'bg-[#BE5A38]/10 text-[#BE5A38]',
+      locked: isStarter,
+      lockReason: `Starter limitado a ${limits.maxBranches ?? 1} sucursal. Actualiza a Pro (3) o Elite (∞).`
     },
     {
       id: 'AUTHORIZED_DEVICES',
@@ -141,12 +148,16 @@ export const PortalSidebar: React.FC = () => {
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = portalModule === item.id;
+          const locked = (item as any).locked;
           return (
             <button
               key={item.id}
               id={`sidebar-nav-${item.id.toLowerCase()}`}
-              onClick={() => setPortalModule(item.id)}
+              onClick={() => { if (locked) { alert((item as any).lockReason); return; } setPortalModule(item.id); }}
+              disabled={!!locked}
+              title={locked ? (item as any).lockReason : undefined}
               className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all ${
+                locked ? 'opacity-50 cursor-not-allowed bg-amber-50 text-amber-800 border border-amber-200' :
                 isActive
                   ? 'bg-gradient-to-r from-[#BE5A38] to-[#D97706] text-white shadow-sm shadow-[#BE5A38]/20'
                   : 'text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#1C1917]'

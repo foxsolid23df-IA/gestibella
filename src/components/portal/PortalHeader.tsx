@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useSalon } from '../../context/SalonContext';
 import { TenantBadge } from '../TenantBadge';
+import { useTenant } from '../../lib/tenantContext';
 
 export const PortalHeader: React.FC = () => {
   const {
@@ -26,6 +27,7 @@ export const PortalHeader: React.FC = () => {
   } = useSalon();
 
   const openHoldTickets = ticketsList.filter((t) => t.status === 'HOLD');
+  const { tenant, limits, daysRemaining } = useTenant();
 
   return (
     <header className="bg-white border-b border-[#E8DFD8] px-4 sm:px-6 py-3 sticky top-0 z-30 shadow-xs">
@@ -51,9 +53,14 @@ export const PortalHeader: React.FC = () => {
           </div>
         </div>
 
-        {/* Center: Open Hold Tickets Alert Indicator + Tenant */}
+        {/* Center: Open Hold Tickets Alert Indicator + Tenant + Licencia */}
         <div className="flex items-center gap-3">
           <TenantBadge />
+          {tenant && (
+            <span className={`hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${daysRemaining!==null && daysRemaining<0 ? 'bg-rose-50 border-rose-200 text-rose-700' : daysRemaining!==null && daysRemaining<7 ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-white border-[#E8DFD8] text-[#57534E]'}`}>
+              {tenant.plan_tier?.toUpperCase()} · {limits.maxStaff??'∞'} staff · {tenant.current_period_end ? new Date(tenant.current_period_end).toLocaleDateString() : '—'} {daysRemaining!==null ? `(${daysRemaining<0?Math.abs(daysRemaining)+'d vencida':daysRemaining+'d'})` : ''}
+            </span>
+          )}
           <button
             id="btn-header-hold-tickets"
             onClick={() => setPortalModule('POS')}
