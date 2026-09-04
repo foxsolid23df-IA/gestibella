@@ -11,6 +11,7 @@ interface TenantInfo {
 interface TenantContextType {
   tenantId: string | null;
   tenantSlug: string;
+  setTenantSlug: (slug: string) => void;
   tenant: TenantInfo | null;
   isLoading: boolean;
   isDemoMock: boolean;
@@ -24,37 +25,39 @@ interface TenantContextType {
 const TenantContext = createContext<TenantContextType | undefined>(undefined);
 
 export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [tenantSlug] = useState(() => getTenantSlug());
+  const [tenantSlug, setTenantSlug] = useState(() => getTenantSlug());
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [tenant, setTenant] = useState<TenantInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Si hay sesión Auth, priorizar tenant_id del JWT (RLS tenant_isolation)
+  // Si hay sesión Auth, priorizar tenant_id del JWT (RLS tenant_isolation) — permite login sin ?tenant
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) {
       setIsLoading(false);
       return;
     }
     let cancelled = false;
-    (async () => {
+    const resolve = async (overrideSlug?: string) => {
       try {
-        // 1) Intentar leer tenant desde JWT (post-006)
+        setIsLoading(true);
+        setError(null);
         const { data: { session } } = await supabase.auth.getSession();
         const jwtTenantId = (session?.user as any)?.app_metadata?.tenant_id || (session?.access_token ? (()=>{ try{ const p=JSON.parse(atob(session.access_token.split('.')[1])); return p.tenant_id; }catch{ return null; }})() : null);
+        // Si hay JWT con tenant_id, priorizar; si no, usar slug (para demo/anon). overrideSlug permite forzar tras login
+        const effectiveSlug = overrideSlug ?? tenantSlug;
         let id: string | null = null;
         if (jwtTenantId) {
           id = jwtTenantId;
         } else {
-          id = await resolveTenantId(tenantSlug);
+          id = await resolveTenantId(effectiveSlug);
         }
         if (cancelled) return;
         if (!id) {
-          setError(`Tenant no encontrado: ${tenantSlug}. Verifica VITE_DEMO_TENANT_SLUG y seed.sql`);
+          setError(`Tenant no encontrado: ${effectiveSlug}. Verifica VITE_DEMO_TENANT_SLUG y seed.sql`);
           setIsLoading(false);
           return;
         }
-        // Intenta leer cols nuevas (005/008), fallback a cols base si aún no migrado
         let data: any = null;
         const { data: full, error: fullErr } = await supabase.from('tenants').select('id,slug,business_name,plan_tier,max_staff,max_branches,max_clients,status,trial_ends_at,current_period_end,owner_email,is_demo').eq('id', id).single();
         if (!fullErr && full) data = full;
@@ -65,15 +68,28 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (!cancelled && data) {
           setTenantId(data.id);
           setTenant(data as TenantInfo);
+          if (data.slug !== tenantSlug) {
+            // Sincronizar slug sin exponer ?tenant en URL para cliente (solo super-admin usa atajo oculto)
+            localStorage.setItem('gestibella_tenant_slug', data.slug);
+          }
         }
       } catch (e: any) {
         if (!cancelled) setError(e.message);
       } finally {
         if (!cancelled) setIsLoading(false);
       }
-    })();
-    // Re-resolver al cambiar sesión
-    const { data: sub } = supabase.auth.onAuthStateChange(()=>{ /* trigger re-fetch via tenantSlug change */ });
+    };
+    resolve();
+    // Re-resolver al cambiar sesión (login/logout) — ahora sí reacciona y deriva tenant del JWT sin ?tenant
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, _session) => {
+      const jwtTenantId = (_session as any)?.user?.app_metadata?.tenant_id || (()=>{ try{ const p=JSON.parse(atob((_session as any)?.access_token?.split('.')[1] || '')); return p?.tenant_id; }catch{ return null; }})();
+      if (jwtTenantId) resolve();
+      else if (_event === 'SIGNED_OUT') {
+        // Al salir, volver a demo
+        const demoSlug = getTenantSlug();
+        setTenantSlug(demoSlug);
+      }
+    });
     return () => { cancelled = true; sub.subscription.unsubscribe(); };
   }, [tenantSlug]);
 
@@ -88,7 +104,7 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const isExpired = !!(tenant?.current_period_end && new Date(tenant.current_period_end).getTime() < Date.now() && tenant?.status !== 'active');
 
   return (
-    <TenantContext.Provider value={{ tenantId, tenantSlug, tenant, isLoading, isDemoMock, isDemoEphemeral, error, limits, isExpired, daysRemaining }}>
+    <TenantContext.Provider value={{ tenantId, tenantSlug, setTenantSlug, tenant, isLoading, isDemoMock, isDemoEphemeral, error, limits, isExpired, daysRemaining }}>
       {children}
     </TenantContext.Provider>
   );

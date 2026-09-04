@@ -249,7 +249,24 @@ export const SalonProvider: React.FC<{children:React.ReactNode}> = ({ children }
 
   const loginAs = (staffId:string)=>{
     const found = staffList.find(s=>s.id===staffId);
-    if(found){ setCurrentStaff(found); setIsPortalOpen(true); setIsLoginModalOpen(false); addToast('success','Sesión Iniciada',`Bienvenido(a) a GestiBella, ${found.name} (${found.roleTitle})`); }
+    if(found){ setCurrentStaff(found); setIsPortalOpen(true); setIsLoginModalOpen(false); addToast('success','Sesión Iniciada',`Bienvenido(a) a GestiBella, ${found.name} (${found.roleTitle})`); return; }
+    // Fallback: si el staff no está en lista local (login cross-tenant sin ?tenant), buscar en Supabase
+    if (isSupabaseEnabled && supabase) {
+      supabase.from('staff').select('*').eq('id', staffId).maybeSingle().then(({data})=>{
+        if (data) {
+          const mapped: StaffMember = { id: data.id, name: data.name, role: data.role, roleTitle: data.role_title, avatar: data.avatar, email: data.email, phone: data.phone, serviceCommissionRate: Number(data.service_commission_rate), productCommissionRate: Number(data.product_commission_rate), specialties: data.specialties||[], colorTag: data.color_tag, isActive: data.is_active, permissions: data.permissions };
+          setStaffList(prev => {
+            if (prev.find(s=>s.id===mapped.id)) return prev;
+            return [...prev, mapped];
+          });
+          setCurrentStaff(mapped);
+          setIsPortalOpen(true); setIsLoginModalOpen(false);
+          addToast('success','Sesión Iniciada',`Bienvenido(a) a GestiBella, ${mapped.name} (${mapped.roleTitle})`);
+        } else {
+          addToast('error','Credenciales inválidas','Verifica tu correo y contraseña.');
+        }
+      });
+    }
   };
   const logout = ()=>{
     if (isDemoEphemeral) {

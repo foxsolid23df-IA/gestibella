@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useSalon } from '../../context/SalonContext';
 import { useTenant } from '../../lib/tenantContext';
+import { supabase, isSupabaseConfigured } from '../../lib/supabaseClient';
 
 export const LoginModal: React.FC = () => {
   const {
@@ -19,7 +20,7 @@ export const LoginModal: React.FC = () => {
     loginAs,
     addToast
   } = useSalon();
-  const { isDemoEphemeral } = useTenant();
+  const { isDemoEphemeral, setTenantSlug } = useTenant();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -49,7 +50,6 @@ export const LoginModal: React.FC = () => {
       addToast('error', 'Campos Incompletos', 'Por favor ingresa tu correo y contraseña.');
       return;
     }
-    const { supabase, isSupabaseConfigured } = await import('../../lib/supabaseClient');
     // Solo el botón "Probar Demo sin contraseña" entra sin validar; el form principal siempre valida
     if (isSupabaseConfigured && supabase) {
       setIsLoading(true);
@@ -57,22 +57,37 @@ export const LoginModal: React.FC = () => {
         const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
         if (error) throw new Error('Credenciales inválidas');
         if (!data.user) throw new Error('Credenciales inválidas');
-        // Derivar tenant vía RPC (no expone lista)
+        // Derivar tenant vía RPC (no expone lista) — sin ?tenant
         const { data: rpcData, error: rpcErr } = await supabase.rpc('get_my_tenant' as any);
-        if (rpcErr || !rpcData || (Array.isArray(rpcData) && rpcData.length === 0)) {
-          // Fallback: buscar staff por auth_user_id
-          const { data: staff } = await supabase.from('staff').select('id').eq('auth_user_id', data.user.id).maybeSingle();
-          if (staff?.id) {
-            loginAs(staff.id);
+        let tenantRow: any = null;
+        if (!rpcErr && rpcData && !(Array.isArray(rpcData) && rpcData.length === 0)) {
+          tenantRow = Array.isArray(rpcData) ? rpcData[0] : rpcData as any;
+          // Sincronizar TenantContext sin exponer ?tenant en URL para cliente (solo super-admin usa atajo oculto)
+          if (tenantRow?.slug) {
+            localStorage.setItem('gestibella_tenant_slug', tenantRow.slug);
+            try { setTenantSlug(tenantRow.slug); } catch {}
+          }
+        } else {
+          // Fallback: buscar staff por auth_user_id (si RPC no disponible)
+          const { data: staffFallback } = await supabase.from('staff').select('id, tenant_id').eq('auth_user_id', data.user.id).maybeSingle();
+          if (staffFallback?.id) {
+            // Intentar resolver slug del tenant para sincronizar
+            const { data: t } = await supabase.from('tenants').select('slug').eq('id', staffFallback.tenant_id).maybeSingle();
+            if (t?.slug) {
+              localStorage.setItem('gestibella_tenant_slug', t.slug);
+              try { setTenantSlug(t.slug); } catch {}
+            }
+            loginAs(staffFallback.id);
             addToast('success', 'Sesión Iniciada', `Bienvenida, ${data.user.email}`);
             return;
           }
           throw new Error('Credenciales inválidas');
         }
-        const tenantRow = Array.isArray(rpcData) ? rpcData[0] : rpcData as any;
         // Buscar staff vinculado a este auth_user_id dentro de ese tenant
         const { data: staff } = await supabase.from('staff').select('id').eq('auth_user_id', data.user.id).eq('tenant_id', tenantRow.tenant_id).maybeSingle();
         if (staff?.id) {
+          // Pequeña espera para que TenantContext rehidrate staffList del nuevo tenant antes de loginAs
+          await new Promise(r => setTimeout(r, 300));
           loginAs(staff.id);
           addToast('success', 'Sesión Iniciada', `Bienvenida, ${data.user.email}`);
           return;
