@@ -151,49 +151,93 @@ export const SalonProvider: React.FC<{children:React.ReactNode}> = ({ children }
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
 
   // Load from Supabase on tenant ready (hard migration read)
+  // Tenant limpio: nuevos tenants inician vacíos, solo gestibella-demo mantiene seed como demo
   useEffect(() => {
     if (!isSupabaseEnabled || !supabase || !tenantId) return;
     let cancelled=false;
     (async()=>{
       try{
-        const [staffRes, branchesRes, clientsRes, apptsRes, ticketsRes, expensesRes, inventoryRes, waitlistRes] = await Promise.all([
+        const [staffRes, branchesRes, clientsRes, apptsRes, ticketsRes, expensesRes, waitlistRes, formulasRes] = await Promise.all([
           supabase.from('staff').select('*').eq('tenant_id', tenantId),
           supabase.from('branches').select('*').eq('tenant_id', tenantId),
           supabase.from('clients').select('*').eq('tenant_id', tenantId),
           supabase.from('appointments').select('*').eq('tenant_id', tenantId),
           supabase.from('tickets').select('*, ticket_items(*)').eq('tenant_id', tenantId),
           supabase.from('expenses').select('*').eq('tenant_id', tenantId),
-          supabase.from('inventory_items').select('*, branch_inventory(*)').eq('tenant_id', tenantId),
           supabase.from('waitlist_entries').select('*').eq('tenant_id', tenantId),
+          supabase.from('technical_formulas').select('*').eq('tenant_id', tenantId),
         ]);
         if(cancelled) return;
-        if(staffRes.data && staffRes.data.length>0){
-          const mapped: StaffMember[] = staffRes.data.map((r:any)=>({ id:r.id, name:r.name, role:r.role, roleTitle:r.role_title, avatar:r.avatar, email:r.email, phone:r.phone, serviceCommissionRate:Number(r.service_commission_rate), productCommissionRate:Number(r.product_commission_rate), specialties:r.specialties||[], colorTag:r.color_tag, isActive:r.is_active, permissions:r.permissions }));
-          setStaffList(mapped); setCurrentStaff(mapped[0]);
+        const isDemoTenant = tenant?.slug === 'gestibella-demo';
+        // Staff y branches: siempre hidratar si hay datos (incluye tenant nuevo con 1 staff/1 branch)
+        if(staffRes.data){
+          if(staffRes.data.length>0){
+            const mapped: StaffMember[] = staffRes.data.map((r:any)=>({ id:r.id, name:r.name, role:r.role, roleTitle:r.role_title, avatar:r.avatar, email:r.email, phone:r.phone, serviceCommissionRate:Number(r.service_commission_rate), productCommissionRate:Number(r.product_commission_rate), specialties:r.specialties||[], colorTag:r.color_tag, isActive:r.is_active, permissions:r.permissions }));
+            setStaffList(mapped); setCurrentStaff(mapped[0]);
+          } else if (!isDemoTenant) {
+            setStaffList([]); // tenant limpio sin demo staff
+          }
         }
-        if(branchesRes.data && branchesRes.data.length>0){
-          setBranches(branchesRes.data.map((r:any)=>({ id:r.id, name:r.name, code:r.code, address:r.address, phone:r.phone, managerName:r.manager_name, activeStaffCount:r.active_staff_count, todaySales:Number(r.today_sales), monthlyRevenue:Number(r.monthly_revenue), status:r.status, colorTag:r.color_tag })));
+        if(branchesRes.data){
+          if(branchesRes.data.length>0){
+            setBranches(branchesRes.data.map((r:any)=>({ id:r.id, name:r.name, code:r.code, address:r.address, phone:r.phone, managerName:r.manager_name, activeStaffCount:r.active_staff_count, todaySales:Number(r.today_sales), monthlyRevenue:Number(r.monthly_revenue), status:r.status, colorTag:r.color_tag })));
+          } else if (!isDemoTenant) {
+            setBranches([]);
+          }
         }
-        if(clientsRes.data && clientsRes.data.length>0){
-          setClientsList(clientsRes.data.map((r:any)=>({ id:r.id, name:r.name, phone:r.phone, email:r.email, avatar:r.avatar, joinedDate:r.joined_date, totalSpent:Number(r.total_spent), visitCount:r.visit_count, loyaltyPoints:r.loyalty_points, stampCardCount:r.stamp_card_count, preferredStaffId:r.preferred_staff_id, allergiesOrNotes:r.allergies_or_notes, activePackages:[] })));
+        // Datos operativos: para tenant limpio, vacío si no hay datos; para demo, mantener seed si vacío
+        if(clientsRes.data){
+          if(clientsRes.data.length>0){
+            setClientsList(clientsRes.data.map((r:any)=>({ id:r.id, name:r.name, phone:r.phone, email:r.email, avatar:r.avatar, joinedDate:r.joined_date, totalSpent:Number(r.total_spent), visitCount:r.visit_count, loyaltyPoints:r.loyalty_points, stampCardCount:r.stamp_card_count, preferredStaffId:r.preferred_staff_id, allergiesOrNotes:r.allergies_or_notes, activePackages:[] })));
+          } else if (!isDemoTenant) {
+            setClientsList([]);
+          }
         }
-        // appointments, tickets, etc. — si hay datos, hidratar; si no, mantener seed local (no sobrescribir demo vacío)
-        if(apptsRes.data && apptsRes.data.length>0){
-          setAppointmentsList(apptsRes.data.map((r:any)=>({ id:r.id, clientName:r.client_name, clientPhone:r.client_phone, clientId:r.client_id, staffId:r.staff_id, serviceId:r.service_id, serviceName:r.service_name, date:r.date, time:r.time, durationMinutes:r.duration_minutes, price:Number(r.price), status:r.status, notes:r.notes, ticketId:r.ticket_id, notificationSent:r.notification_sent, depositRequired:r.deposit_required, depositAmount:r.deposit_amount?Number(r.deposit_amount):undefined, depositPaid:r.deposit_paid, depositPaidAt:r.deposit_paid_at, depositPaymentMethod:r.deposit_payment_method, suggestedUpsellId:r.suggested_upsell_id, upsellAccepted:r.upsell_accepted, upsellItemName:r.upsell_item_name, upsellItemPrice:r.upsell_item_price?Number(r.upsell_item_price):undefined })));
+        if(apptsRes.data){
+          if(apptsRes.data.length>0){
+            setAppointmentsList(apptsRes.data.map((r:any)=>({ id:r.id, clientName:r.client_name, clientPhone:r.client_phone, clientId:r.client_id, staffId:r.staff_id, serviceId:r.service_id, serviceName:r.service_name, date:r.date, time:r.time, durationMinutes:r.duration_minutes, price:Number(r.price), status:r.status, notes:r.notes, ticketId:r.ticket_id, notificationSent:r.notification_sent, depositRequired:r.deposit_required, depositAmount:r.deposit_amount?Number(r.deposit_amount):undefined, depositPaid:r.deposit_paid, depositPaidAt:r.deposit_paid_at, depositPaymentMethod:r.deposit_payment_method, suggestedUpsellId:r.suggested_upsell_id, upsellAccepted:r.upsell_accepted, upsellItemName:r.upsell_item_name, upsellItemPrice:r.upsell_item_price?Number(r.upsell_item_price):undefined })));
+          } else if (!isDemoTenant) {
+            setAppointmentsList([]);
+          }
         }
-        if(ticketsRes.data && ticketsRes.data.length>0){
-          setTicketsList(ticketsRes.data.map((r:any)=>({ id:r.id, ticketNumber:r.ticket_number, clientId:r.client_id, clientName:r.client_name, chairNumber:r.chair_number, status:r.status, createdAt:r.created_at, appointmentId:r.appointment_id, items:(r.ticket_items||[]).map((it:any)=>({ id:it.id, type:it.type, itemId:it.item_id, name:it.name, staffId:it.staff_id, quantity:Number(it.quantity), unitPrice:Number(it.unit_price), discount:Number(it.discount), total:Number(it.total)})), subtotal:Number(r.subtotal), discountTotal:Number(r.discount_total), depositCredited:Number(r.deposit_credited), tax:Number(r.tax), tip:Number(r.tip), total:Number(r.total), paymentMethod:r.payment_method, paymentDetails:r.payment_details, paidAt:r.paid_at, closedByStaffId:r.closed_by_staff_id })));
+        if(ticketsRes.data){
+          if(ticketsRes.data.length>0){
+            setTicketsList(ticketsRes.data.map((r:any)=>({ id:r.id, ticketNumber:r.ticket_number, clientId:r.client_id, clientName:r.client_name, chairNumber:r.chair_number, status:r.status, createdAt:r.created_at, appointmentId:r.appointment_id, items:(r.ticket_items||[]).map((it:any)=>({ id:it.id, type:it.type, itemId:it.item_id, name:it.name, staffId:it.staff_id, quantity:Number(it.quantity), unitPrice:Number(it.unit_price), discount:Number(it.discount), total:Number(it.total)})), subtotal:Number(r.subtotal), discountTotal:Number(r.discount_total), depositCredited:Number(r.deposit_credited), tax:Number(r.tax), tip:Number(r.tip), total:Number(r.total), paymentMethod:r.payment_method, paymentDetails:r.payment_details, paidAt:r.paid_at, closedByStaffId:r.closed_by_staff_id })));
+          } else if (!isDemoTenant) {
+            setTicketsList([]);
+          }
         }
-        if(expensesRes.data && expensesRes.data.length>0){
-          setExpensesList(expensesRes.data.map((r:any)=>({ id:r.id, date:r.date, concept:r.concept, category:r.category, amount:Number(r.amount), paymentMethod:r.payment_method, receiptNumber:r.receipt_number, registeredBy:r.registered_by })));
+        if(expensesRes.data){
+          if(expensesRes.data.length>0){
+            setExpensesList(expensesRes.data.map((r:any)=>({ id:r.id, date:r.date, concept:r.concept, category:r.category, amount:Number(r.amount), paymentMethod:r.payment_method, receiptNumber:r.receipt_number, registeredBy:r.registered_by })));
+          } else if (!isDemoTenant) {
+            setExpensesList([]);
+          }
         }
-        if(waitlistRes.data && waitlistRes.data.length>0){
-          setWaitlistEntries(waitlistRes.data.map((r:any)=>({ id:r.id, clientName:r.client_name, clientPhone:r.client_phone, clientId:r.client_id, serviceId:r.service_id, serviceName:r.service_name, preferredStaffId:r.preferred_staff_id, preferredDate:r.preferred_date, preferredTimeRange:r.preferred_time_range, status:r.status, notes:r.notes, createdAt:r.created_at, lastNotifiedAt:r.last_notified_at, notificationHistory:r.notification_history })));
+        if(waitlistRes.data){
+          if(waitlistRes.data.length>0){
+            setWaitlistEntries(waitlistRes.data.map((r:any)=>({ id:r.id, clientName:r.client_name, clientPhone:r.client_phone, clientId:r.client_id, serviceId:r.service_id, serviceName:r.service_name, preferredStaffId:r.preferred_staff_id, preferredDate:r.preferred_date, preferredTimeRange:r.preferred_time_range, status:r.status, notes:r.notes, createdAt:r.created_at, lastNotifiedAt:r.last_notified_at, notificationHistory:r.notification_history })));
+          } else if (!isDemoTenant) {
+            setWaitlistEntries([]);
+          }
+        }
+        if(formulasRes.data){
+          if(formulasRes.data.length>0){
+            setFormulasList(formulasRes.data.map((r:any)=>({ id:r.id, clientId:r.client_id, clientName:r.client_name, date:r.date, staffId:r.staff_id, staffName:r.staff_name, serviceType:r.service_type, baseNatural:r.base_natural, porosity:r.porosity, formulaDetails:r.formula_details, exposureTimeMinutes:r.exposure_time_minutes, treatmentUsed:r.treatment_used, photoUrl:r.photo_url, notes:r.notes })));
+          } else if (!isDemoTenant) {
+            setFormulasList([]);
+          }
+        }
+        // Si es tenant limpio y no tiene datos, también limpiar branchTransfers (no hay endpoint, se queda con seed pero se puede ignorar)
+        if (!isDemoTenant) {
+          // inventory y servicios también deberían quedar vacíos para tenant limpio, pero los dejamos con seed por ahora
+          // Si quieres inventario limpio, descomenta:
+          // setInventoryList([]);
         }
       } catch(e){ console.warn('[supabase hydrate]',e); }
     })();
     return ()=>{ cancelled=true; };
-  }, [isSupabaseEnabled, tenantId]);
+  }, [isSupabaseEnabled, tenantId, tenant?.slug]);
 
   const addToast = useCallback((type:ToastNotification['type'], title:string, message:string)=>{
     const id = Date.now().toString()+Math.random().toString().slice(2,5);
