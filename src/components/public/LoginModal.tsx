@@ -23,10 +23,9 @@ export const LoginModal: React.FC = () => {
 
   const [email, setEmail] = useState('valentina@gestibella.com');
   const [password, setPassword] = useState('••••••••');
+  const [isLoading, setIsLoading] = useState(false);
 
   if (!isLoginModalOpen) return null;
-
-  const [isLoading, setIsLoading] = useState(false);
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
