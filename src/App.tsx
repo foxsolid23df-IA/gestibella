@@ -177,10 +177,26 @@ const MainContent: React.FC = () => {
   );
 };
 
+const ToastContainer: React.FC = () => {
+  const { toasts, removeToast } = useSalon();
+  if (!toasts.length) return null;
+  return (
+    <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 max-w-sm">
+      {toasts.map(t => (
+        <div key={t.id} className={`px-4 py-3 rounded-xl shadow-lg border text-xs flex items-start justify-between gap-3 ${t.type==='success'?'bg-emerald-50 border-emerald-200 text-emerald-900': t.type==='error'?'bg-rose-50 border-rose-200 text-rose-800': t.type==='warning'?'bg-amber-50 border-amber-200 text-amber-900':'bg-white border-[#E8DFD8] text-[#1C1917]'}`}>
+          <div><div className="font-bold">{t.title}</div><div className="text-[11px] opacity-90">{t.message}</div></div>
+          <button onClick={()=>removeToast(t.id)} className="text-[10px] opacity-60 hover:opacity-100">✕</button>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 export default function App() {
   return (
     <SalonProvider>
       <MainContent />
+      <ToastContainer />
     </SalonProvider>
   );
 }

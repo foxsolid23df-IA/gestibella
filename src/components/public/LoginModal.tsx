@@ -88,6 +88,7 @@ export const LoginModal: React.FC = () => {
         }
         throw new Error('Credenciales inválidas');
       } catch (err: any) {
+        console.error('[LoginModal] login failed', err, { email: email.trim().toLowerCase() });
         // Mensaje genérico siempre, no revelar si email existe o tenant
         addToast('error', 'Credenciales inválidas', 'Verifica tu correo, contraseña y que tu cuenta esté activa.');
       } finally {
