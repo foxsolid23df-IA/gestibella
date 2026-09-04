@@ -30,7 +30,7 @@ export function getTenantSlug(): string {
 export async function resolveTenantId(slug?: string): Promise<string | null> {
   if (!isSupabaseConfigured || !supabase) return null;
   const s = slug || getTenantSlug();
-  const { data, error } = await supabase.from('tenants').select('id').eq('slug', s).single();
+  const { data, error } = await supabase.from('tenants').select('id').eq('slug', s).maybeSingle();
   if (error || !data) return null;
   return data.id;
 }

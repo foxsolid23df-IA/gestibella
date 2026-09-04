@@ -59,11 +59,11 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           return;
         }
         let data: any = null;
-        const { data: full, error: fullErr } = await supabase.from('tenants').select('id,slug,business_name,plan_tier,max_staff,max_branches,max_clients,status,trial_ends_at,current_period_end,owner_email,is_demo').eq('id', id).single();
+        const { data: full, error: fullErr } = await supabase.from('tenants').select('id,slug,business_name,plan_tier,max_staff,max_branches,max_clients,status,trial_ends_at,current_period_end,owner_email,is_demo').eq('id', id).maybeSingle();
         if (!fullErr && full) data = full;
         else {
-          const { data: base } = await supabase.from('tenants').select('id,slug,business_name').eq('id', id).single();
-          data = base ? { ...base, plan_tier: 'pro', max_staff: 10, max_branches: 3, max_clients: null, status: 'active', is_demo: base.slug === 'gestibella-demo' } : null;
+          const { data: base } = await supabase.from('tenants').select('id,slug,business_name').eq('id', id).maybeSingle();
+          data = base ? { ...base, plan_tier: 'pro', max_staff: 10, max_branches: 3, max_clients: null, status: 'active', is_demo: (base as any).slug === 'gestibella-demo' } : null;
         }
         if (!cancelled && data) {
           setTenantId(data.id);

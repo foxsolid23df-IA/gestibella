@@ -29,14 +29,11 @@ export const LoginModal: React.FC = () => {
   if (!isLoginModalOpen) return null;
 
   const handleDemoEnter = () => {
-    // Demo efímero sin password: siempre entra como Valentina en gestibella-demo
-    if (!isDemoEphemeral) {
-      localStorage.setItem('gestibella_tenant_slug', 'gestibella-demo');
-      window.location.href = window.location.pathname + '?tenant=gestibella-demo';
-      return;
-    }
+    // Demo 100% memoria: entra directo como Valentina sin tocar Supabase ni recargar
+    // Funciona incluso si tenant es null (anon sin resolver) o si estamos en un tenant real
     const demoStaff = staffList.find((s) => s.email.toLowerCase() === 'valentina@gestibella.com') || staffList.find((s) => s.role === 'ADMIN') || staffList[0];
     if (demoStaff) {
+      // No cambiar tenantSlug ni recargar: loginAs en modo demo es local y epímero
       loginAs(demoStaff.id);
       addToast('success', 'Demo iniciado', 'Estás en modo demo efímero — lo que crees se borrará al salir.');
     } else {
