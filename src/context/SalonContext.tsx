@@ -251,7 +251,8 @@ export const SalonProvider: React.FC<{children:React.ReactNode}> = ({ children }
     const found = staffList.find(s=>s.id===staffId);
     if(found){ setCurrentStaff(found); setIsPortalOpen(true); setIsLoginModalOpen(false); addToast('success','Sesión Iniciada',`Bienvenido(a) a GestiBella, ${found.name} (${found.roleTitle})`); return; }
     // Fallback: si el staff no está en lista local (login cross-tenant sin ?tenant), buscar en Supabase
-    if (isSupabaseEnabled && supabase) {
+    // Usar isSupabaseConfigured, no isSupabaseEnabled (puede estar en demo efímero y aún necesitar fetch cross-tenant)
+    if (isSupabaseConfigured && supabase) {
       supabase.from('staff').select('*').eq('id', staffId).maybeSingle().then(({data})=>{
         if (data) {
           const mapped: StaffMember = { id: data.id, name: data.name, role: data.role, roleTitle: data.role_title, avatar: data.avatar, email: data.email, phone: data.phone, serviceCommissionRate: Number(data.service_commission_rate), productCommissionRate: Number(data.product_commission_rate), specialties: data.specialties||[], colorTag: data.color_tag, isActive: data.is_active, permissions: data.permissions };
