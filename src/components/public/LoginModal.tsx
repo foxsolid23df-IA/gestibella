@@ -57,38 +57,32 @@ export const LoginModal: React.FC = () => {
         const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
         if (error) throw new Error('Credenciales inválidas');
         if (!data.user) throw new Error('Credenciales inválidas');
-        // Derivar tenant vía RPC (no expone lista) — sin ?tenant
+        // Derivar tenant y staff vía RPC (no expone lista, funciona sin hook y sin segunda query bloqueada)
         const { data: rpcData, error: rpcErr } = await supabase.rpc('get_my_tenant' as any);
         let tenantRow: any = null;
+        let staffIdFromRpc: string | null = null;
         if (!rpcErr && rpcData && !(Array.isArray(rpcData) && rpcData.length === 0)) {
           tenantRow = Array.isArray(rpcData) ? rpcData[0] : rpcData as any;
-          // Sincronizar TenantContext sin exponer ?tenant en URL para cliente (solo super-admin usa atajo oculto)
+          staffIdFromRpc = (tenantRow as any).staff_id || null;
           if (tenantRow?.slug) {
             localStorage.setItem('gestibella_tenant_slug', tenantRow.slug);
             try { setTenantSlug(tenantRow.slug); } catch {}
           }
-        } else {
-          // Fallback: buscar staff por auth_user_id (si RPC no disponible)
-          const { data: staffFallback } = await supabase.from('staff').select('id, tenant_id').eq('auth_user_id', data.user.id).maybeSingle();
-          if (staffFallback?.id) {
-            // Intentar resolver slug del tenant para sincronizar
-            const { data: t } = await supabase.from('tenants').select('slug').eq('id', staffFallback.tenant_id).maybeSingle();
-            if (t?.slug) {
-              localStorage.setItem('gestibella_tenant_slug', t.slug);
-              try { setTenantSlug(t.slug); } catch {}
-            }
-            loginAs(staffFallback.id);
+          if (staffIdFromRpc) {
+            loginAs(staffIdFromRpc);
             addToast('success', 'Sesión Iniciada', `Bienvenida, ${data.user.email}`);
             return;
           }
-          throw new Error('Credenciales inválidas');
         }
-        // Buscar staff vinculado a este auth_user_id dentro de ese tenant
-        const { data: staff } = await supabase.from('staff').select('id').eq('auth_user_id', data.user.id).eq('tenant_id', tenantRow.tenant_id).maybeSingle();
-        if (staff?.id) {
-          // Pequeña espera para que TenantContext rehidrate staffList del nuevo tenant antes de loginAs
-          await new Promise(r => setTimeout(r, 300));
-          loginAs(staff.id);
+        // Fallback legacy (si RPC no devuelve staff_id)
+        const { data: staffFallback } = await supabase.from('staff').select('id, tenant_id').eq('auth_user_id', data.user.id).maybeSingle();
+        if (staffFallback?.id) {
+          const { data: t } = await supabase.from('tenants').select('slug').eq('id', staffFallback.tenant_id).maybeSingle();
+          if (t?.slug) {
+            localStorage.setItem('gestibella_tenant_slug', t.slug);
+            try { setTenantSlug(t.slug); } catch {}
+          }
+          loginAs(staffFallback.id);
           addToast('success', 'Sesión Iniciada', `Bienvenida, ${data.user.email}`);
           return;
         }
