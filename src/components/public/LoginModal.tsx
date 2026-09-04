@@ -172,18 +172,20 @@ export const LoginModal: React.FC = () => {
               Ingresa tu correo y contraseña asignados por tu administrador. Cada cuenta está vinculada a su salón — no necesitas elegir tenant.
             </p>
             {isDemoEphemeral && (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-amber-900">
-                <div className="font-bold text-xs">Demo efímero</div>
-                <p className="text-[11px]">Prueba sin compromiso: lo que crees se borrará al salir. Para tu salón real, usa tu email y contraseña.</p>
-              </div>
+              <>
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-amber-900">
+                  <div className="font-bold text-xs">Demo efímero</div>
+                  <p className="text-[11px]">Prueba sin compromiso: lo que crees se borrará al salir. Para tu salón real, usa tu email y contraseña.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleDemoEnter}
+                  className="w-full mt-1 py-2 bg-white border border-[#BE5A38] text-[#BE5A38] rounded-xl text-xs font-bold hover:bg-[#FFF7F3] flex items-center justify-center gap-2"
+                >
+                  Probar Demo sin contraseña
+                </button>
+              </>
             )}
-            <button
-              type="button"
-              onClick={handleDemoEnter}
-              className="w-full mt-1 py-2 bg-white border border-[#BE5A38] text-[#BE5A38] rounded-xl text-xs font-bold hover:bg-[#FFF7F3] flex items-center justify-center gap-2"
-            >
-              Probar Demo sin contraseña
-            </button>
           </div>
 
           <button
