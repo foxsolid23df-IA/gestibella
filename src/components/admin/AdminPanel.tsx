@@ -81,9 +81,23 @@ export const AdminPanel: React.FC = () => {
         tenant_id: tenant.id, code, plan_tier: form.plan_tier, max_staff: limits.max_staff, max_branches: limits.max_branches, expires_at, status:'active', notes: `Alta manual ${form.duration}`
       });
       if (lErr) throw lErr;
-      // crear branch inicial + staff admin bootstrap para que el salón pueda entrar
+      // crear branch inicial + staff admin (propietario) para que pueda iniciar sesión de inmediato
       await supabase.from('branches').insert({ tenant_id: tenant.id, code:'MAIN-01', name: form.business_name+' (Principal)', address: '—', manager_name: 'Propietario', status:'ACTIVE', color_tag:'#BE5A38' });
-      setMsg(`✅ Salón creado: ${cleanSlug} · Licencia ${code} vence ${new Date(expires_at).toLocaleDateString()}`);
+      if (form.owner_email) {
+        const ownerName = form.business_name.includes(' ') ? `Propietario ${form.business_name.split(' ')[0]}` : `Propietario ${form.business_name}`;
+        await supabase.from('staff').insert({
+          tenant_id: tenant.id,
+          name: ownerName,
+          email: form.owner_email.toLowerCase().trim(),
+          role: 'ADMIN',
+          role_title: 'Propietario & Administrador',
+          avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&auto=format&fit=crop&q=80',
+          service_commission_rate: 0.5, product_commission_rate: 0.15,
+          specialties: ['Administración'], color_tag: '#BE5A38', is_active: true,
+          permissions: {canAccessPOS:true, canAccessFinances:true, canAccessInventory:true, canAccessReports:true, canManageStaff:true}
+        });
+      }
+      setMsg(`✅ Salón creado: ${cleanSlug} · Licencia ${code} vence ${new Date(expires_at).toLocaleDateString()}${form.owner_email ? ` · Owner ${form.owner_email} ya puede ingresar en ?tenant=${cleanSlug} → Acceso al Software` : ''}`);
       setShowCreate(false); setForm({slug:'',business_name:'',owner_email:'',plan_tier:'starter',duration:'1m'}); load();
     }catch(e:any){
       const msg = (e as any).message || String(e);

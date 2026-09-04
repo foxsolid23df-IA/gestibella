@@ -11,6 +11,7 @@ import { Footer } from './components/public/Footer';
 import { LoginModal } from './components/public/LoginModal';
 import { Privacy } from './components/public/Privacy';
 import { Terms } from './components/public/Terms';
+import { ActivateLicense } from './components/public/ActivateLicense';
 
 import { PortalHeader } from './components/portal/PortalHeader';
 import { PortalSidebar } from './components/portal/PortalSidebar';
@@ -106,6 +107,7 @@ const MainContent: React.FC = () => {
   const path = typeof window !== 'undefined' ? window.location.pathname : '/';
   if (path === '/privacidad') return <div className="min-h-screen bg-[#FAF7F2]"><Privacy /><Footer /></div>;
   if (path === '/terminos') return <div className="min-h-screen bg-[#FAF7F2]"><Terms /><Footer /></div>;
+  if (path === '/activar' || path === '/activar-licencia') return <div className="min-h-screen bg-[#FAF7F2]"><ActivateLicense /><Footer /></div>;
 
   if (isPortalOpen) {
     return (
