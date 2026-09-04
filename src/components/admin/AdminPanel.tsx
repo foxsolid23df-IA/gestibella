@@ -47,27 +47,50 @@ export const AdminPanel: React.FC = () => {
   };
   useEffect(()=>{ load(); }, []);
 
+  const slugify = (s: string) =>
+    s.toLowerCase().trim()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/[\s_]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+
   const createTenant = async () => {
     if (!form.slug || !form.business_name) { setMsg('Slug y nombre requeridos'); return; }
+    const cleanSlug = slugify(form.slug);
+    if (!cleanSlug) { setMsg('❌ Slug inválido: usa solo letras sin acentos, números y guiones (ej. salon-roma, bella-norte). No uses espacios, acentos ni "_"'); return; }
+    if (cleanSlug !== form.slug.toLowerCase().trim()) {
+      setMsg(`ℹ️ Slug corregido a "${cleanSlug}" (sin acentos/espacios/mayúsculas)`);
+    }
+    if (!/^[a-z0-9-]+$/.test(cleanSlug)) { setMsg('❌ Slug inválido: solo a-z, 0-9 y guiones. Ejemplos: salon-roma, bella-norte, spa-polanco'); return; }
     if (!supabase) return;
     const limits = form.plan_tier==='starter' ? {max_staff:3,max_branches:1,max_clients:150} : form.plan_tier==='pro' ? {max_staff:10,max_branches:3,max_clients:null} : {max_staff:null,max_branches:null,max_clients:null};
     const expires_at = form.duration==='1m' ? new Date(Date.now()+30*86400000).toISOString() : new Date(Date.now()+365*86400000).toISOString();
     const code = 'GB-'+new Date().getFullYear()+'-'+Math.random().toString(36).substring(2,8).toUpperCase();
     try{
       const { data: tenant, error: tErr } = await supabase.from('tenants').insert({
-        slug: form.slug.toLowerCase().trim(), business_name: form.business_name.trim(),
+        slug: cleanSlug, business_name: form.business_name.trim(),
         plan_tier: form.plan_tier, ...limits, status:'active', current_period_end: expires_at, trial_ends_at: new Date(Date.now()+14*86400000).toISOString(), owner_email: form.owner_email||null
       }).select('id').single();
-      if (tErr) throw tErr;
+      if (tErr) {
+        if ((tErr as any).code === '23505') throw new Error(`El slug "${cleanSlug}" ya existe. Usa otro (ej. ${cleanSlug}-2)`);
+        if ((tErr as any).code === '23514') throw new Error(`Slug "${cleanSlug}" no cumple formato: solo letras sin acentos, números y guiones.`);
+        throw tErr;
+      }
       const { error: lErr } = await supabase.from('licenses').insert({
         tenant_id: tenant.id, code, plan_tier: form.plan_tier, max_staff: limits.max_staff, max_branches: limits.max_branches, expires_at, status:'active', notes: `Alta manual ${form.duration}`
       });
       if (lErr) throw lErr;
       // crear branch inicial + staff admin bootstrap para que el salón pueda entrar
       await supabase.from('branches').insert({ tenant_id: tenant.id, code:'MAIN-01', name: form.business_name+' (Principal)', address: '—', manager_name: 'Propietario', status:'ACTIVE', color_tag:'#BE5A38' });
-      setMsg(`✅ Salón creado: ${form.slug} · Licencia ${code} vence ${new Date(expires_at).toLocaleDateString()}`);
+      setMsg(`✅ Salón creado: ${cleanSlug} · Licencia ${code} vence ${new Date(expires_at).toLocaleDateString()}`);
       setShowCreate(false); setForm({slug:'',business_name:'',owner_email:'',plan_tier:'starter',duration:'1m'}); load();
-    }catch(e:any){ setMsg('❌ '+(e.message||String(e))); }
+    }catch(e:any){
+      const msg = (e as any).message || String(e);
+      if (msg.includes('violates check constraint "tenants_slug_check"') || msg.includes('23514')) {
+        setMsg('❌ Slug inválido: solo letras sin acentos, números y guiones (ej. salon-roma). No uses espacios, acentos, mayúsculas ni "_"');
+      } else { setMsg('❌ '+msg); }
+    }
   };
 
   const renew = async (tenant: TenantRow, duration:'1m'|'12m')=>{
@@ -120,7 +143,10 @@ export const AdminPanel: React.FC = () => {
 
       {showCreate && (
         <div className="bg-white border border-[#E8DFD8] rounded-2xl p-4 grid sm:grid-cols-2 gap-3">
-          <input placeholder="slug (ej. salon-roma)" value={form.slug} onChange={e=>setForm({...form, slug:e.target.value})} className="bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl px-3 py-2.5 text-sm"/>
+          <div className="space-y-1">
+            <input placeholder="slug (ej. salon-roma)" value={form.slug} onChange={e=>setForm({...form, slug:e.target.value})} className="bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl px-3 py-2.5 text-sm w-full"/>
+            <p className="text-[10px] text-[#A8A29E] px-1">Solo letras sin acentos, números y guiones. Ej: <code>salon-roma</code>, <code>bella-norte</code>. Se corrige automático (espacios→guión, acentos→sin acento).</p>
+          </div>
           <input placeholder="Nombre del salón" value={form.business_name} onChange={e=>setForm({...form, business_name:e.target.value})} className="bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl px-3 py-2.5 text-sm"/>
           <input placeholder="Email propietario (opcional)" value={form.owner_email} onChange={e=>setForm({...form, owner_email:e.target.value})} className="bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl px-3 py-2.5 text-sm"/>
           <div className="flex gap-2">
