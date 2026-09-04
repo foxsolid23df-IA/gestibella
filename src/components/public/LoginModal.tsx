@@ -60,10 +60,29 @@ export const LoginModal: React.FC = () => {
       }
       setIsLoading(false);
     }
-    // Fallback fake (demo / compat)
+    // Fallback fake (demo / compat): intentar por email exacto primero
+    const byEmail = staffList.find((s) => s.email.toLowerCase() === email.trim().toLowerCase());
+    if (byEmail) {
+      loginAs(byEmail.id);
+      addToast('success', 'Sesión Iniciada', `Bienvenida, ${byEmail.name} (${byEmail.roleTitle})`);
+      return;
+    }
+    // Si el email no existe en este tenant, avisar claramente
+    if (email.trim().toLowerCase().includes('valentina') && tenantSlug !== 'gestibella-demo') {
+      addToast('error', 'Tenant incorrecto', `Valentina solo existe en gestibella-demo. Estás en "${tenantSlug}". Cambia con ?tenant=gestibella-demo`);
+      return;
+    }
+    if (email.trim().toLowerCase().includes('foxsolid22df') && tenantSlug !== 'salon-prueba') {
+      addToast('error', 'Tenant incorrecto', `foxsolid22df@gmail.com es de salon-prueba. Estás en "${tenantSlug}". Cambia con ?tenant=salon-prueba`);
+      return;
+    }
     const adminStaff = staffList.find((s) => s.role === 'ADMIN' || s.role === 'RECEPTIONIST') || staffList[0];
-    loginAs(adminStaff.id);
-    addToast('success', 'Sesión Iniciada', 'Bienvenida al portal de gestión GestiBella.');
+    if (adminStaff) {
+      loginAs(adminStaff.id);
+      addToast('success', 'Sesión Iniciada', 'Bienvenida al portal de gestión GestiBella.');
+    } else {
+      addToast('error', 'Sin personal', 'Este salón aún no tiene staff. Contacta al super-admin.');
+    }
   };
 
   return (
@@ -141,7 +160,12 @@ export const LoginModal: React.FC = () => {
               <span className={`w-2 h-2 rounded-full ${isDemoMock ? 'bg-amber-500' : 'bg-emerald-500'}`}></span>
               <span className="font-bold">Modo: {isDemoMock ? 'DEMO (login fake)' : 'Supabase'}</span> — Tenant: <span className="font-mono bg-white px-1 rounded border">{tenantSlug}</span>
             </p>
-            {!isDemoMock && <p className="text-[10px] text-[#A8A29E]">Cambia tenant con <span className="font-mono">?tenant=slug</span> en la URL</p>}
+            <div className="flex flex-wrap gap-1.5 mt-1.5">
+              <a href="?tenant=gestibella-demo" className={`px-2 py-1 rounded-full text-[10px] font-bold border ${tenantSlug==='gestibella-demo'?'bg-[#BE5A38] text-white border-[#BE5A38]':'bg-white border-[#E8DFD8] text-[#57534E] hover:bg-[#FAF7F2]'}`}>Demo · Valentina</a>
+              <a href="?tenant=salon-prueba" className={`px-2 py-1 rounded-full text-[10px] font-bold border ${tenantSlug==='salon-prueba'?'bg-[#BE5A38] text-white border-[#BE5A38]':'bg-white border-[#E8DFD8] text-[#57534E] hover:bg-[#FAF7F2]'}`}>POPOTLA · Propietario</a>
+              <button type="button" onClick={()=>{ localStorage.removeItem('gestibella_tenant_slug'); window.location.href='?tenant=gestibella-demo'; }} className="px-2 py-1 rounded-full text-[10px] bg-white border border-[#E8DFD8]">Reset</button>
+            </div>
+            {!isDemoMock && <p className="text-[10px] text-[#A8A29E]">Valentina solo en <code>gestibella-demo</code> · Propietario POPOTLA solo en <code>salon-prueba</code></p>}
           </div>
 
           <button
