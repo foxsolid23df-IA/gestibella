@@ -20,7 +20,7 @@ export const LoginModal: React.FC = () => {
     loginAs,
     addToast
   } = useSalon();
-  const { isDemoEphemeral, setTenantSlug } = useTenant();
+  const { isDemoEphemeral, tenant, setTenantSlug } = useTenant();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -171,12 +171,14 @@ export const LoginModal: React.FC = () => {
             <p>
               Ingresa tu correo y contraseña asignados por tu administrador. Cada cuenta está vinculada a su salón — no necesitas elegir tenant.
             </p>
-            {isDemoEphemeral && (
+            {(!tenant || isDemoEphemeral) && (
               <>
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-amber-900">
-                  <div className="font-bold text-xs">Demo efímero</div>
-                  <p className="text-[11px]">Prueba sin compromiso: lo que crees se borrará al salir. Para tu salón real, usa tu email y contraseña.</p>
-                </div>
+                {isDemoEphemeral && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-amber-900">
+                    <div className="font-bold text-xs">Demo efímero</div>
+                    <p className="text-[11px]">Prueba sin compromiso: lo que crees se borrará al salir. Para tu salón real, usa tu email y contraseña.</p>
+                  </div>
+                )}
                 <button
                   type="button"
                   onClick={handleDemoEnter}
