@@ -19,7 +19,7 @@ export const LoginModal: React.FC = () => {
     loginAs,
     addToast
   } = useSalon();
-  const { isDemoMock, isDemoEphemeral, tenant } = useTenant();
+  const { isDemoEphemeral } = useTenant();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -28,7 +28,12 @@ export const LoginModal: React.FC = () => {
   if (!isLoginModalOpen) return null;
 
   const handleDemoEnter = () => {
-    // Demo efímero sin password: entra como Valentina (o primer staff) y todo lo que escriba se resetea al salir
+    // Demo efímero sin password: siempre entra como Valentina en gestibella-demo
+    if (!isDemoEphemeral) {
+      localStorage.setItem('gestibella_tenant_slug', 'gestibella-demo');
+      window.location.href = window.location.pathname + '?tenant=gestibella-demo';
+      return;
+    }
     const demoStaff = staffList.find((s) => s.email.toLowerCase() === 'valentina@gestibella.com') || staffList.find((s) => s.role === 'ADMIN') || staffList[0];
     if (demoStaff) {
       loginAs(demoStaff.id);
@@ -45,24 +50,7 @@ export const LoginModal: React.FC = () => {
       return;
     }
     const { supabase, isSupabaseConfigured } = await import('../../lib/supabaseClient');
-    // Demo efímero: si el tenant actual es demo, permitir entrada sin validar password (escritura local)
-    if (isDemoEphemeral || isDemoMock) {
-      // Intentar por email exacto si existe, si no, entrar como demo genérico
-      const byEmail = staffList.find((s) => s.email.toLowerCase() === email.trim().toLowerCase());
-      if (byEmail) {
-        loginAs(byEmail.id);
-        addToast('success', 'Sesión Demo', `Bienvenida, ${byEmail.name}`);
-        return;
-      }
-      // Demo sin password: si no hay match, entra como Valentina demo
-      const demoStaff = staffList.find((s) => s.email.toLowerCase() === 'valentina@gestibella.com') || staffList[0];
-      if (demoStaff) {
-        loginAs(demoStaff.id);
-        addToast('success', 'Demo iniciado', 'Modo demo — escritura efímera.');
-        return;
-      }
-    }
-    // Tenant real: validar email+password vía Supabase Auth, sin exponer slugs
+    // Solo el botón "Probar Demo sin contraseña" entra sin validar; el form principal siempre valida
     if (isSupabaseConfigured && supabase) {
       setIsLoading(true);
       try {
