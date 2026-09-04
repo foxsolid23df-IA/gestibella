@@ -19,70 +19,87 @@ export const LoginModal: React.FC = () => {
     loginAs,
     addToast
   } = useSalon();
-  const { tenantSlug, isDemoMock } = useTenant();
+  const { isDemoMock, isDemoEphemeral, tenant } = useTenant();
 
-  const [email, setEmail] = useState('valentina@gestibella.com');
-  const [password, setPassword] = useState('••••••••');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   if (!isLoginModalOpen) return null;
+
+  const handleDemoEnter = () => {
+    // Demo efímero sin password: entra como Valentina (o primer staff) y todo lo que escriba se resetea al salir
+    const demoStaff = staffList.find((s) => s.email.toLowerCase() === 'valentina@gestibella.com') || staffList.find((s) => s.role === 'ADMIN') || staffList[0];
+    if (demoStaff) {
+      loginAs(demoStaff.id);
+      addToast('success', 'Demo iniciado', 'Estás en modo demo efímero — lo que crees se borrará al salir.');
+    } else {
+      addToast('error', 'Demo no disponible', 'No se encontró staff demo.');
+    }
+  };
+
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
       addToast('error', 'Campos Incompletos', 'Por favor ingresa tu correo y contraseña.');
       return;
     }
-    // Si Supabase Auth está configurado y no es demo, intenta login real; fallback a fake para no romper demo
     const { supabase, isSupabaseConfigured } = await import('../../lib/supabaseClient');
-    if (isSupabaseConfigured && supabase && !isDemoMock) {
-      setIsLoading(true);
-      const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-      if (!error && data.user) {
-        // Buscar staff vinculado a este auth_user_id
-        const { data: staff } = await supabase.from('staff').select('id').eq('auth_user_id', data.user.id).maybeSingle();
-        if (staff?.id) {
-          loginAs(staff.id);
-          addToast('success', 'Sesión Iniciada (Auth)', `Bienvenida, ${data.user.email}`);
-          setIsLoading(false);
-          return;
-        }
-        // Si no hay staff vinculado pero el login fue válido, permitir entrada como ADMIN genérico
-        const adminStaff = staffList.find((s) => s.role === 'ADMIN') || staffList[0];
-        loginAs(adminStaff.id);
-        addToast('success', 'Sesión Iniciada (Auth sin staff vinculado)', 'Bienvenida al portal.');
-        setIsLoading(false);
+    // Demo efímero: si el tenant actual es demo, permitir entrada sin validar password (escritura local)
+    if (isDemoEphemeral || isDemoMock) {
+      // Intentar por email exacto si existe, si no, entrar como demo genérico
+      const byEmail = staffList.find((s) => s.email.toLowerCase() === email.trim().toLowerCase());
+      if (byEmail) {
+        loginAs(byEmail.id);
+        addToast('success', 'Sesión Demo', `Bienvenida, ${byEmail.name}`);
         return;
       }
-      // Si falla Auth (ej. usuario no existe en auth.users), fallback a fake para mantener compatibilidad demo
-      if (error) {
-        // No bloquear: intenta fake
-        console.warn('[LoginModal] Auth falló, fallback fake:', error.message);
+      // Demo sin password: si no hay match, entra como Valentina demo
+      const demoStaff = staffList.find((s) => s.email.toLowerCase() === 'valentina@gestibella.com') || staffList[0];
+      if (demoStaff) {
+        loginAs(demoStaff.id);
+        addToast('success', 'Demo iniciado', 'Modo demo — escritura efímera.');
+        return;
       }
-      setIsLoading(false);
     }
-    // Fallback fake (demo / compat): intentar por email exacto primero
-    const byEmail = staffList.find((s) => s.email.toLowerCase() === email.trim().toLowerCase());
-    if (byEmail) {
-      loginAs(byEmail.id);
-      addToast('success', 'Sesión Iniciada', `Bienvenida, ${byEmail.name} (${byEmail.roleTitle})`);
+    // Tenant real: validar email+password vía Supabase Auth, sin exponer slugs
+    if (isSupabaseConfigured && supabase) {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
+        if (error) throw new Error('Credenciales inválidas');
+        if (!data.user) throw new Error('Credenciales inválidas');
+        // Derivar tenant vía RPC (no expone lista)
+        const { data: rpcData, error: rpcErr } = await supabase.rpc('get_my_tenant' as any);
+        if (rpcErr || !rpcData || (Array.isArray(rpcData) && rpcData.length === 0)) {
+          // Fallback: buscar staff por auth_user_id
+          const { data: staff } = await supabase.from('staff').select('id').eq('auth_user_id', data.user.id).maybeSingle();
+          if (staff?.id) {
+            loginAs(staff.id);
+            addToast('success', 'Sesión Iniciada', `Bienvenida, ${data.user.email}`);
+            return;
+          }
+          throw new Error('Credenciales inválidas');
+        }
+        const tenantRow = Array.isArray(rpcData) ? rpcData[0] : rpcData as any;
+        // Buscar staff vinculado a este auth_user_id dentro de ese tenant
+        const { data: staff } = await supabase.from('staff').select('id').eq('auth_user_id', data.user.id).eq('tenant_id', tenantRow.tenant_id).maybeSingle();
+        if (staff?.id) {
+          loginAs(staff.id);
+          addToast('success', 'Sesión Iniciada', `Bienvenida, ${data.user.email}`);
+          return;
+        }
+        throw new Error('Credenciales inválidas');
+      } catch (err: any) {
+        // Mensaje genérico siempre, no revelar si email existe o tenant
+        addToast('error', 'Credenciales inválidas', 'Verifica tu correo, contraseña y que tu cuenta esté activa.');
+      } finally {
+        setIsLoading(false);
+      }
       return;
     }
-    // Si el email no existe en este tenant, avisar claramente
-    if (email.trim().toLowerCase().includes('valentina') && tenantSlug !== 'gestibella-demo') {
-      addToast('error', 'Tenant incorrecto', `Valentina solo existe en gestibella-demo. Estás en "${tenantSlug}". Cambia con ?tenant=gestibella-demo`);
-      return;
-    }
-    if (email.trim().toLowerCase().includes('foxsolid22df') && tenantSlug !== 'salon-prueba') {
-      addToast('error', 'Tenant incorrecto', `foxsolid22df@gmail.com es de salon-prueba. Estás en "${tenantSlug}". Cambia con ?tenant=salon-prueba`);
-      return;
-    }
-    const adminStaff = staffList.find((s) => s.role === 'ADMIN' || s.role === 'RECEPTIONIST') || staffList[0];
-    if (adminStaff) {
-      loginAs(adminStaff.id);
-      addToast('success', 'Sesión Iniciada', 'Bienvenida al portal de gestión GestiBella.');
-    } else {
-      addToast('error', 'Sin personal', 'Este salón aún no tiene staff. Contacta al super-admin.');
-    }
+    // Fallback final genérico
+    addToast('error', 'Credenciales inválidas', 'Verifica tu correo y contraseña.');
   };
 
   return (
@@ -148,24 +165,27 @@ export const LoginModal: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-[#FAF7F2] p-3.5 rounded-2xl border border-[#E8DFD8] text-[11px] text-[#57534E] space-y-1">
+          <div className="bg-[#FAF7F2] p-3.5 rounded-2xl border border-[#E8DFD8] text-[11px] text-[#57534E] space-y-2">
             <div className="font-bold text-[#BE5A38] flex items-center gap-1">
               <Building2 className="w-3.5 h-3.5" />
-              <span>Flujo Operativo del Salón:</span>
+              <span>Acceso Seguro</span>
             </div>
             <p>
-              Los trabajadores (estilistas) no requieren cuenta ni acceso a la aplicación. La recepción o el administrador gestionan el calendario y les asignan e indican sus citas directamente.
+              Ingresa tu correo y contraseña asignados por tu administrador. Cada cuenta está vinculada a su salón — no necesitas elegir tenant.
             </p>
-            <p className="pt-1.5 mt-1.5 border-t border-[#E8DFD8] flex items-center gap-1.5">
-              <span className={`w-2 h-2 rounded-full ${isDemoMock ? 'bg-amber-500' : 'bg-emerald-500'}`}></span>
-              <span className="font-bold">Modo: {isDemoMock ? 'DEMO (login fake)' : 'Supabase'}</span> — Tenant: <span className="font-mono bg-white px-1 rounded border">{tenantSlug}</span>
-            </p>
-            <div className="flex flex-wrap gap-1.5 mt-1.5">
-              <a href="?tenant=gestibella-demo" className={`px-2 py-1 rounded-full text-[10px] font-bold border ${tenantSlug==='gestibella-demo'?'bg-[#BE5A38] text-white border-[#BE5A38]':'bg-white border-[#E8DFD8] text-[#57534E] hover:bg-[#FAF7F2]'}`}>Demo · Valentina</a>
-              <a href="?tenant=salon-prueba" className={`px-2 py-1 rounded-full text-[10px] font-bold border ${tenantSlug==='salon-prueba'?'bg-[#BE5A38] text-white border-[#BE5A38]':'bg-white border-[#E8DFD8] text-[#57534E] hover:bg-[#FAF7F2]'}`}>POPOTLA · Propietario</a>
-              <button type="button" onClick={()=>{ localStorage.removeItem('gestibella_tenant_slug'); window.location.href='?tenant=gestibella-demo'; }} className="px-2 py-1 rounded-full text-[10px] bg-white border border-[#E8DFD8]">Reset</button>
-            </div>
-            {!isDemoMock && <p className="text-[10px] text-[#A8A29E]">Valentina solo en <code>gestibella-demo</code> · Propietario POPOTLA solo en <code>salon-prueba</code></p>}
+            {isDemoEphemeral && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-amber-900">
+                <div className="font-bold text-xs">Demo efímero</div>
+                <p className="text-[11px]">Prueba sin compromiso: lo que crees se borrará al salir. Para tu salón real, usa tu email y contraseña.</p>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={handleDemoEnter}
+              className="w-full mt-1 py-2 bg-white border border-[#BE5A38] text-[#BE5A38] rounded-xl text-xs font-bold hover:bg-[#FFF7F3] flex items-center justify-center gap-2"
+            >
+              Probar Demo sin contraseña
+            </button>
           </div>
 
           <button

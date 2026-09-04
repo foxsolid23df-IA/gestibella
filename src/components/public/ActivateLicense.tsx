@@ -3,8 +3,10 @@ import { KeyRound, Mail, Lock, CheckCircle2, AlertTriangle, ArrowRight } from 'l
 import { supabase, isSupabaseConfigured } from '../../lib/supabaseClient';
 
 export const ActivateLicense: React.FC = () => {
-  const [code, setCode] = useState('GB-2026-QSHT7W');
-  const [email, setEmail] = useState('foxsolid22df@gmail.com');
+  // Esta ruta es solo para soporte interno; el cliente normal no ve el GB code.
+  // El flujo principal es: admin crea tenant + staff owner → cliente recibe email + ?tenant=SLUG y entra directo con su password.
+  const [code, setCode] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [msg, setMsg] = useState<string|null>(null);
   const [ok, setOk] = useState(false);
@@ -96,9 +98,8 @@ export const ActivateLicense: React.FC = () => {
           </button>
         </form>
         <div className="mt-6 pt-4 border-t border-[#F0E8E1] space-y-2 text-[11px] text-[#78716C]">
-          <p><b>¿Dónde ingresar después?</b> Ve a <code>https://gestibella.vercel.app?tenant=TU-SLUG</code> → botón <b>Acceso al Software</b> → entra con el <b>email y contraseña</b> que acabas de crear.</p>
-          <p><b>¿Ya tienes staff?</b> Si tu email ya existe como propietario (creado desde /admin), este formulario lo vinculará y te dará acceso inmediato sin duplicar.</p>
-          <p className="bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl p-2">Código actual: <code className="font-mono">salon-prueba → GB-2026-QSHT7W → foxsolid22df@gmail.com</code> — ya tiene staff creado, solo necesita activar contraseña si aún no tiene usuario Auth.</p>
+          <p><b>¿Dónde ingresar después?</b> Ve a <code>https://gestibella.vercel.app?tenant=TU-SLUG</code> → botón <b>Acceso al Software</b> → entra con tu <b>email y contraseña</b>.</p>
+          <p className="bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl p-2">Flujo recomendado: el super-admin te crea la cuenta y te envía <b>email + link ?tenant=</b> por WhatsApp. No necesitas el código GB.</p>
         </div>
       </div>
     </div>

@@ -101,9 +101,10 @@ async function sbRpcTransfer(tenantId:string, source:string, dest:string, produc
 }
 
 export const SalonProvider: React.FC<{children:React.ReactNode}> = ({ children }) => {
-  const { tenantId, isLoading: isTenantLoading, limits, isExpired, tenant } = useTenant();
+  const { tenantId, isLoading: isTenantLoading, limits, isExpired, tenant, isDemoEphemeral } = useTenant();
   const qc = useQueryClient();
-  const isSupabaseEnabled = isSupabaseConfigured && !!tenantId;
+  // Demo efímero: no persistir a Supabase, todo queda en memoria y se resetea al salir
+  const isSupabaseEnabled = isSupabaseConfigured && !!tenantId && !isDemoEphemeral;
 
   // Navigation — ephemeral (no localStorage)
   const [isPortalOpen, setIsPortalOpen] = useState(false);
@@ -250,7 +251,25 @@ export const SalonProvider: React.FC<{children:React.ReactNode}> = ({ children }
     const found = staffList.find(s=>s.id===staffId);
     if(found){ setCurrentStaff(found); setIsPortalOpen(true); setIsLoginModalOpen(false); addToast('success','Sesión Iniciada',`Bienvenido(a) a GestiBella, ${found.name} (${found.roleTitle})`); }
   };
-  const logout = ()=>{ setIsPortalOpen(false); addToast('info','Sesión Finalizada','Has salido del portal exclusivo del salón.'); };
+  const logout = ()=>{
+    if (isDemoEphemeral) {
+      // Demo efímero: resetear todo lo escrito al salir
+      setStaffList(INITIAL_STAFF); setCurrentStaff(INITIAL_STAFF[0]);
+      setInventoryList(INITIAL_INVENTORY); setClientsList(INITIAL_CLIENTS);
+      setFormulasList(INITIAL_FORMULAS); setAppointmentsList(INITIAL_APPOINTMENTS);
+      setTicketsList(INITIAL_TICKETS); setExpensesList(INITIAL_EXPENSES);
+      setWaitlistEntries(INITIAL_WAITLIST); setBranches([
+        { id:'branch-1', name:'GestiBella Polanco (Principal)', code:'POL-01', address:'Av. Presidente Masaryk 360, Polanco, CDMX', phone:'+52 55 5540 8890', managerName:'Valentina Vega', activeStaffCount:6, todaySales:14920, monthlyRevenue:384000, status:'ACTIVE', colorTag:'#BE5A38' },
+        { id:'branch-2', name:'GestiBella Roma Norte', code:'ROM-02', address:'Álvaro Obregón 130, Roma Nte., CDMX', phone:'+52 55 5264 1190', managerName:'Mariana Silva', activeStaffCount:4, todaySales:9850, monthlyRevenue:245000, status:'ACTIVE', colorTag:'#2D2A26' },
+        { id:'branch-3', name:'GestiBella Satélite', code:'SAT-03', address:'Blvd. Manuel Ávila Camacho 2200, Naucalpan', phone:'+52 55 5373 4410', managerName:'Carlos Mendieta', activeStaffCount:5, todaySales:11200, monthlyRevenue:310000, status:'ACTIVE', colorTag:'#D97706' }
+      ]); setBranchTransfers(INITIAL_BRANCH_TRANSFERS);
+      // Cerrar sesión Supabase anon si existe
+      if (isSupabaseConfigured && supabase) supabase.auth.signOut();
+    } else {
+      if (isSupabaseConfigured && supabase) supabase.auth.signOut();
+    }
+    setIsPortalOpen(false); addToast('info','Sesión Finalizada','Has salido del portal exclusivo del salón.');
+  };
 
   const addStaffMember = (data:Omit<StaffMember,'id'>)=>{
     if (limits.maxStaff !== null && staffList.length >= limits.maxStaff) {

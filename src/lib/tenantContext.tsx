@@ -5,6 +5,7 @@ interface TenantInfo {
   id: string; slug: string; business_name: string;
   plan_tier?: 'starter'|'pro'|'elite'; max_staff?: number|null; max_branches?: number|null; max_clients?: number|null;
   status?: string; trial_ends_at?: string|null; current_period_end?: string|null; owner_email?: string|null;
+  is_demo?: boolean;
 }
 
 interface TenantContextType {
@@ -13,6 +14,7 @@ interface TenantContextType {
   tenant: TenantInfo | null;
   isLoading: boolean;
   isDemoMock: boolean;
+  isDemoEphemeral: boolean;
   error: string | null;
   limits: { maxStaff: number|null; maxBranches: number|null; maxClients: number|null };
   isExpired: boolean;
@@ -52,13 +54,13 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           setIsLoading(false);
           return;
         }
-        // Intenta leer cols nuevas (005), fallback a cols base si aún no migrado
+        // Intenta leer cols nuevas (005/008), fallback a cols base si aún no migrado
         let data: any = null;
-        const { data: full, error: fullErr } = await supabase.from('tenants').select('id,slug,business_name,plan_tier,max_staff,max_branches,max_clients,status,trial_ends_at,current_period_end,owner_email').eq('id', id).single();
+        const { data: full, error: fullErr } = await supabase.from('tenants').select('id,slug,business_name,plan_tier,max_staff,max_branches,max_clients,status,trial_ends_at,current_period_end,owner_email,is_demo').eq('id', id).single();
         if (!fullErr && full) data = full;
         else {
           const { data: base } = await supabase.from('tenants').select('id,slug,business_name').eq('id', id).single();
-          data = base ? { ...base, plan_tier: 'pro', max_staff: 10, max_branches: 3, max_clients: null, status: 'active' } : null;
+          data = base ? { ...base, plan_tier: 'pro', max_staff: 10, max_branches: 3, max_clients: null, status: 'active', is_demo: base.slug === 'gestibella-demo' } : null;
         }
         if (!cancelled && data) {
           setTenantId(data.id);
@@ -76,6 +78,7 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [tenantSlug]);
 
   const isDemoMock = !isSupabaseConfigured;
+  const isDemoEphemeral = !!tenant?.is_demo;
   const limits = {
     maxStaff: tenant?.max_staff ?? (tenant?.plan_tier === 'starter' ? 3 : tenant?.plan_tier === 'pro' ? 10 : null),
     maxBranches: tenant?.max_branches ?? (tenant?.plan_tier === 'starter' ? 1 : tenant?.plan_tier === 'pro' ? 3 : null),
@@ -85,7 +88,7 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const isExpired = !!(tenant?.current_period_end && new Date(tenant.current_period_end).getTime() < Date.now() && tenant?.status !== 'active');
 
   return (
-    <TenantContext.Provider value={{ tenantId, tenantSlug, tenant, isLoading, isDemoMock, error, limits, isExpired, daysRemaining }}>
+    <TenantContext.Provider value={{ tenantId, tenantSlug, tenant, isLoading, isDemoMock, isDemoEphemeral, error, limits, isExpired, daysRemaining }}>
       {children}
     </TenantContext.Provider>
   );
