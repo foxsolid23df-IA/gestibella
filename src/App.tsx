@@ -37,24 +37,51 @@ import { useTenant } from './lib/tenantContext';
 const AdminRouteGuard: React.FC = () => {
   const [checking, setChecking] = React.useState(true);
   const [isAllowed, setIsAllowed] = React.useState(false);
-  React.useEffect(()=>{
-    (async()=>{
+  const [email, setEmail] = React.useState('foxsolid23df@gmail.com');
+  const [password, setPassword] = React.useState('');
+  const [loginError, setLoginError] = React.useState<string|null>(null);
+  const [loggingIn, setLoggingIn] = React.useState(false);
+  const check = React.useCallback(async()=>{
       const { supabase, isSupabaseConfigured } = await import('./lib/supabaseClient');
-      if (!isSupabaseConfigured || !supabase) { setIsAllowed(true); setChecking(false); return; } // demo: permite
+      if (!isSupabaseConfigured || !supabase) { setIsAllowed(true); setChecking(false); return; }
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { setIsAllowed(false); setChecking(false); return; }
       const { data } = await supabase.from('platform_admins').select('user_id').eq('user_id', session.user.id).maybeSingle();
       setIsAllowed(!!data);
       setChecking(false);
-    })();
   },[]);
+  React.useEffect(()=>{ check(); },[check]);
+  const handleLogin = async (e: React.FormEvent)=>{
+    e.preventDefault();
+    setLoginError(null); setLoggingIn(true);
+    try{
+      const { supabase } = await import('./lib/supabaseClient');
+      if (!supabase) throw new Error('Supabase no configurado');
+      const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      if (error) throw error;
+      // re-verificar super-admin
+      const { data: row } = await supabase.from('platform_admins').select('user_id').eq('user_id', data.user!.id).maybeSingle();
+      if (!row) throw new Error('Tu usuario no es super-admin (no está en platform_admins).');
+      setIsAllowed(true);
+    }catch(err:any){ setLoginError(err.message || String(err)); }
+    finally{ setLoggingIn(false); }
+  };
   if (checking) return <div className="p-8 text-center text-sm">Verificando acceso super-admin…</div>;
   if (!isAllowed) return (
     <div className="min-h-screen bg-[#FAF7F2] flex items-center justify-center p-6">
-      <div className="bg-white border border-[#E8DFD8] rounded-2xl p-6 max-w-md text-center space-y-3">
-        <h2 className="font-bold">Acceso restringido — Solo super-admin</h2>
-        <p className="text-xs text-[#78716C]">Inicia sesión con tu cuenta de super-admin para acceder a /admin. Si es demo local, este guard está deshabilitado.</p>
-        <a href="/" className="inline-block px-4 py-2 bg-[#1C1917] text-white rounded-xl text-xs font-bold">Volver al sitio</a>
+      <div className="bg-white border border-[#E8DFD8] rounded-2xl p-6 max-w-md w-full space-y-4">
+        <h2 className="font-bold text-center">Acceso restringido — Solo super-admin</h2>
+        <p className="text-xs text-[#78716C] text-center">Inicia sesión con tu cuenta super-admin para acceder a <code>/admin</code>. Ya tienes tu usuario <b>foxsolid23df@gmail.com</b> creado.</p>
+        <form onSubmit={handleLogin} className="space-y-3">
+          <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="Email super-admin" className="w-full bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl px-3 py-2.5 text-sm" required />
+          <input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Contraseña" className="w-full bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl px-3 py-2.5 text-sm" required />
+          {loginError && <div className="bg-rose-50 border border-rose-200 text-rose-700 rounded-xl p-2 text-xs">{loginError}</div>}
+          <button type="submit" disabled={loggingIn} className="w-full py-2.5 bg-[#1C1917] text-white rounded-xl text-sm font-bold disabled:opacity-60">{loggingIn ? 'Verificando...' : 'Iniciar sesión super-admin'}</button>
+        </form>
+        <div className="text-center flex flex-col gap-2">
+          <a href="/" className="text-xs text-[#78716C] hover:text-[#1C1917]">← Volver al sitio</a>
+          <p className="text-[10px] text-[#A8A29E]">Si es demo local sin Supabase, este guard está deshabilitado y entrarías directo.</p>
+        </div>
       </div>
     </div>
   );
