@@ -38,7 +38,7 @@ import { useTenant } from './lib/tenantContext';
 const AdminRouteGuard: React.FC = () => {
   const [checking, setChecking] = React.useState(true);
   const [isAllowed, setIsAllowed] = React.useState(false);
-  const [email, setEmail] = React.useState('foxsolid23df@gmail.com');
+  const [email, setEmail] = React.useState(import.meta.env.VITE_SUPER_ADMIN_EMAIL || '');
   const [password, setPassword] = React.useState('');
   const [loginError, setLoginError] = React.useState<string|null>(null);
   const [loggingIn, setLoggingIn] = React.useState(false);
@@ -72,7 +72,7 @@ const AdminRouteGuard: React.FC = () => {
     <div className="min-h-screen bg-[#FAF7F2] flex items-center justify-center p-6">
       <div className="bg-white border border-[#E8DFD8] rounded-2xl p-6 max-w-md w-full space-y-4">
         <h2 className="font-bold text-center">Acceso restringido — Solo super-admin</h2>
-        <p className="text-xs text-[#78716C] text-center">Inicia sesión con tu cuenta super-admin para acceder a <code>/admin</code>. Ya tienes tu usuario <b>foxsolid23df@gmail.com</b> creado.</p>
+        <p className="text-xs text-[#78716C] text-center">Inicia sesión con tu cuenta super-admin para acceder a <code>/admin</code>.</p>
         <form onSubmit={handleLogin} className="space-y-3">
           <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="Email super-admin" className="w-full bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl px-3 py-2.5 text-sm" required />
           <input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Contraseña" className="w-full bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl px-3 py-2.5 text-sm" required />
