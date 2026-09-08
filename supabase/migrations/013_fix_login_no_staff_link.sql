@@ -27,26 +27,47 @@ DROP FUNCTION IF EXISTS public.get_my_tenant();
 
 CREATE OR REPLACE FUNCTION public.get_my_tenant()
 RETURNS TABLE (tenant_id uuid, slug text, business_name text, is_demo boolean, staff_id uuid)
-LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
-  -- Primary: find via auth_user_id (normal path)
-  SELECT t.id, t.slug, t.business_name, COALESCE(t.is_demo, false), s.id
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  v_auth_id uuid := auth.uid();
+  v_staff RECORD;
+  v_tenant RECORD;
+BEGIN
+  -- Primary: find via auth_user_id
+  SELECT s.id AS sid, t.id AS tid, t.slug AS tslug, t.business_name AS tname, COALESCE(t.is_demo, false) AS tdemo
+  INTO v_staff
   FROM public.staff s
   JOIN public.tenants t ON t.id = s.tenant_id
-  WHERE s.auth_user_id = auth.uid()
-  LIMIT 1
+  WHERE s.auth_user_id = v_auth_id
+  LIMIT 1;
 
-  UNION ALL
+  IF FOUND THEN
+    tenant_id := v_staff.tid;
+    slug := v_staff.tslug;
+    business_name := v_staff.tname;
+    is_demo := v_staff.tdemo;
+    staff_id := v_staff.sid;
+    RETURN NEXT;
+    RETURN;
+  END IF;
 
-  -- Fallback: resolve tenant by email when no staff link exists
-  SELECT t.id, t.slug, t.business_name, COALESCE(t.is_demo, false), NULL::uuid
+  -- Fallback: resolve tenant by email when no staff link
+  SELECT t.id AS tid, t.slug AS tslug, t.business_name AS tname, COALESCE(t.is_demo, false) AS tdemo
+  INTO v_tenant
   FROM public.tenants t
   JOIN public.staff s ON s.tenant_id = t.id
-  WHERE NOT EXISTS (
-    SELECT 1 FROM public.staff sx WHERE sx.auth_user_id = auth.uid()
-  )
-  AND LOWER(s.email) = LOWER((SELECT email FROM auth.users WHERE id = auth.uid()))
+  WHERE LOWER(s.email) = LOWER((SELECT email FROM auth.users WHERE id = v_auth_id))
   LIMIT 1;
-$$;
+
+  IF FOUND THEN
+    tenant_id := v_tenant.tid;
+    slug := v_tenant.tslug;
+    business_name := v_tenant.tname;
+    is_demo := v_tenant.tdemo;
+    staff_id := NULL;
+    RETURN NEXT;
+  END IF;
+END $$;
 
 REVOKE ALL ON FUNCTION public.get_my_tenant() FROM public;
 GRANT EXECUTE ON FUNCTION public.get_my_tenant() TO authenticated;
