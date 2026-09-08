@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, UserCheck, Lock, Hash, ArrowRight, ShieldCheck, Check } from 'lucide-react';
+import { X, UserCheck, ArrowRight, ShieldCheck, Check } from 'lucide-react';
 import { useSalon } from '../../context/SalonContext';
 
 export const SwitchProfileModal: React.FC = () => {
@@ -13,7 +13,7 @@ export const SwitchProfileModal: React.FC = () => {
   } = useSalon();
 
   const [selectedId, setSelectedId] = useState(currentStaff.id);
-  const [pin, setPin] = useState('');
+  const [confirmStep, setConfirmStep] = useState(false);
 
   if (!isSwitchProfileModalOpen) return null;
 
@@ -22,10 +22,14 @@ export const SwitchProfileModal: React.FC = () => {
     const found = staffList.find((s) => s.id === selectedId);
     if (!found) return;
 
-    // Switch profile directly (secure internal staff switch)
+    if (!confirmStep) {
+      setConfirmStep(true);
+      return;
+    }
+
     loginAs(found.id);
     setIsSwitchProfileModalOpen(false);
-    setPin('');
+    setConfirmStep(false);
     addToast('success', 'Perfil Cambiado', `Sesión activa ahora para ${found.name} (${found.roleTitle})`);
   };
 
@@ -37,7 +41,7 @@ export const SwitchProfileModal: React.FC = () => {
           id="btn-close-switch-modal"
           onClick={() => {
             setIsSwitchProfileModalOpen(false);
-            setPin('');
+            setConfirmStep(false);
           }}
           className="absolute top-5 right-5 p-2 rounded-full bg-[#FAF7F2] text-[#78716C] hover:text-[#1C1917] hover:bg-[#EAE0D6] transition-colors cursor-pointer"
         >
@@ -67,7 +71,7 @@ export const SwitchProfileModal: React.FC = () => {
                 return (
                   <div
                     key={staff.id}
-                    onClick={() => setSelectedId(staff.id)}
+                    onClick={() => { setSelectedId(staff.id); setConfirmStep(false); }}
                     className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
                       isSelected
                         ? 'bg-[#FAF7F2] border-[#BE5A38] ring-2 ring-[#BE5A38]/20 shadow-xs'
@@ -98,28 +102,21 @@ export const SwitchProfileModal: React.FC = () => {
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-[#44403C] mb-1">
-              PIN de Acceso Rápido (Opcional o 1234)
-            </label>
-            <div className="relative">
-              <Hash className="w-4 h-4 text-[#A8A29E] absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                id="input-switch-staff-pin"
-                type="password"
-                maxLength={6}
-                value={pin}
-                onChange={(e) => setPin(e.target.value)}
-                placeholder="••••"
-                className="w-full bg-[#FAF7F2] border border-[#D8C3B5] rounded-xl pl-10 pr-3.5 py-2.5 text-xs text-[#1C1917] tracking-widest focus:ring-2 focus:ring-[#BE5A38] focus:outline-none font-bold"
-              />
+          {confirmStep && selectedId !== currentStaff.id && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
+              <p className="text-xs text-amber-800 font-bold">
+                Confirmar cambio de perfil
+              </p>
+              <p className="text-[10px] text-amber-700 mt-1">
+                Cambiarás la sesión activa a este colaborador. Confirma para continuar.
+              </p>
             </div>
-          </div>
+          )}
 
           <div className="flex items-center justify-end gap-3 pt-2">
             <button
               type="button"
-              onClick={() => setIsSwitchProfileModalOpen(false)}
+              onClick={() => { setIsSwitchProfileModalOpen(false); setConfirmStep(false); }}
               className="px-4 py-2.5 bg-[#FAF7F2] text-[#78716C] hover:text-[#1C1917] text-xs font-bold rounded-xl transition-colors cursor-pointer"
             >
               Cancelar
@@ -129,7 +126,7 @@ export const SwitchProfileModal: React.FC = () => {
               type="submit"
               className="px-5 py-2.5 bg-gradient-to-r from-[#BE5A38] to-[#D97706] text-white font-bold text-xs rounded-xl shadow-md hover:from-[#A84E30] hover:to-[#B45309] transition-all flex items-center gap-2 cursor-pointer"
             >
-              <span>Cambiar Perfil</span>
+              <span>{confirmStep ? 'Confirmar Cambio' : 'Cambiar Perfil'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
