@@ -158,7 +158,7 @@ export const SalonProvider: React.FC<{children:React.ReactNode}> = ({ children }
     let cancelled=false;
     (async()=>{
       try{
-        const [staffRes, branchesRes, clientsRes, apptsRes, ticketsRes, expensesRes, waitlistRes, formulasRes] = await Promise.all([
+        const results = await Promise.allSettled([
           supabase.from('staff').select('*').eq('tenant_id', tenantId),
           supabase.from('branches').select('*').eq('tenant_id', tenantId),
           supabase.from('clients').select('*').eq('tenant_id', tenantId),
@@ -170,6 +170,19 @@ export const SalonProvider: React.FC<{children:React.ReactNode}> = ({ children }
         ]);
         if(cancelled) return;
         const isDemoTenant = tenant?.slug === 'gestibella-demo';
+        const staffRes = results[0].status === 'fulfilled' ? results[0].value : { data: null, error: results[0].reason };
+        const branchesRes = results[1].status === 'fulfilled' ? results[1].value : { data: null, error: results[1].reason };
+        const clientsRes = results[2].status === 'fulfilled' ? results[2].value : { data: null, error: results[2].reason };
+        const apptsRes = results[3].status === 'fulfilled' ? results[3].value : { data: null, error: results[3].reason };
+        const ticketsRes = results[4].status === 'fulfilled' ? results[4].value : { data: null, error: results[4].reason };
+        const expensesRes = results[5].status === 'fulfilled' ? results[5].value : { data: null, error: results[5].reason };
+        const waitlistRes = results[6].status === 'fulfilled' ? results[6].value : { data: null, error: results[6].reason };
+        const formulasRes = results[7].status === 'fulfilled' ? results[7].value : { data: null, error: results[7].reason };
+
+        // Log failed queries for debugging
+        results.forEach((r, i) => {
+          if (r.status === 'rejected') console.warn(`[supabase hydrate] query ${i} failed:`, r.reason);
+        });
         // Staff y branches: siempre hidratar si hay datos (incluye tenant nuevo con 1 staff/1 branch)
         if(staffRes.data){
           if(staffRes.data.length>0){
