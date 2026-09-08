@@ -47,14 +47,13 @@ export const LoginModal: React.FC = () => {
       addToast('error', 'Campos Incompletos', 'Por favor ingresa tu correo y contraseña.');
       return;
     }
-    // Solo el botón "Probar Demo sin contraseña" entra sin validar; el form principal siempre valida
     if (isSupabaseConfigured && supabase) {
       setIsLoading(true);
       try {
         const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
         if (error) throw new Error('Credenciales inválidas');
         if (!data.user) throw new Error('Credenciales inválidas');
-        // Derivar tenant y staff vía RPC (no expone lista, funciona sin hook y sin segunda query bloqueada)
+
         const { data: rpcData, error: rpcErr } = await supabase.rpc('get_my_tenant' as any);
         let tenantRow: any = null;
         let staffIdFromRpc: string | null = null;
@@ -71,22 +70,39 @@ export const LoginModal: React.FC = () => {
             return;
           }
         }
-        // Fallback legacy (si RPC no devuelve staff_id)
-        const { data: staffFallback } = await supabase.from('staff').select('id, tenant_id').eq('auth_user_id', data.user.id).maybeSingle();
-        if (staffFallback?.id) {
-          const { data: t } = await supabase.from('tenants').select('slug').eq('id', staffFallback.tenant_id).maybeSingle();
-          if (t?.slug) {
-            localStorage.setItem('gestibella_tenant_slug', t.slug);
-            try { setTenantSlug(t.slug); } catch {}
+
+        // Fallback: query staff by email (RLS allows self-read via auth_user_id)
+        const { data: staffByEmail } = await supabase
+          .from('staff')
+          .select('id, tenant_id')
+          .eq('email', email.trim().toLowerCase())
+          .maybeSingle();
+
+        if (staffByEmail?.id) {
+          // Link auth_user_id to staff for future logins
+          await supabase.from('staff').update({ auth_user_id: data.user.id }).eq('id', staffByEmail.id);
+          if (staffByEmail.tenant_id) {
+            const { data: t } = await supabase.from('tenants').select('slug').eq('id', staffByEmail.tenant_id).maybeSingle();
+            if (t?.slug) {
+              localStorage.setItem('gestibella_tenant_slug', t.slug);
+              try { setTenantSlug(t.slug); } catch {}
+            }
           }
-          loginAs(staffFallback.id);
+          loginAs(staffByEmail.id);
           addToast('success', 'Sesión Iniciada', `Bienvenida, ${data.user.email}`);
           return;
         }
+
+        // Last resort: if RPC returned tenant but no staff, reload page to re-hydrate with new tenant
+        if (tenantRow?.slug) {
+          addToast('success', 'Sesión Iniciada', `Bienvenida, ${data.user.email}`);
+          setTimeout(() => window.location.reload(), 800);
+          return;
+        }
+
         throw new Error('Credenciales inválidas');
       } catch (err: any) {
         console.error('[LoginModal] login failed', err, { email: email.trim().toLowerCase() });
-        // Mensaje genérico siempre, no revelar si email existe o tenant
         addToast('error', 'Credenciales inválidas', 'Verifica tu correo, contraseña y que tu cuenta esté activa.');
       } finally {
         setIsLoading(false);
