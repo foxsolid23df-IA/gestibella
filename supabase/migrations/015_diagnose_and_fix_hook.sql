@@ -18,7 +18,7 @@ SELECT
   t.slug AS tenant_slug
 FROM public.staff s
 JOIN public.tenants t ON t.id = s.tenant_id
-WHERE LOWER(s.email) IN LOWER('foxsolid22df@gmail.com')
+WHERE LOWER(s.email) = LOWER('foxsolid22df@gmail.com')
    OR s.auth_user_id IS NOT NULL;
 
 -- 3) Check all auth users and their staff linkage
