@@ -12,6 +12,7 @@ import { LoginModal } from './components/public/LoginModal';
 import { Privacy } from './components/public/Privacy';
 import { Terms } from './components/public/Terms';
 import { ActivateLicense } from './components/public/ActivateLicense';
+import { ResetPassword } from './components/public/ResetPassword';
 
 import { PortalHeader } from './components/portal/PortalHeader';
 import { PortalSidebar } from './components/portal/PortalSidebar';
@@ -101,6 +102,9 @@ const MainContent: React.FC = () => {
   const { isPortalOpen, portalModule } = useSalon();
   const { isExpired, daysRemaining, tenant } = useTenant();
   const isAdminRoute = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
+  const isPasswordReset = typeof window !== 'undefined' && window.location.hash.includes('type=recovery');
+
+  if (isPasswordReset) return <ResetPassword />;
   if (isAdminRoute) {
     return <AdminRouteGuard />;
   }
@@ -108,6 +112,7 @@ const MainContent: React.FC = () => {
   if (path === '/privacidad') return <div className="min-h-screen bg-[#FAF7F2]"><Privacy /><Footer /></div>;
   if (path === '/terminos') return <div className="min-h-screen bg-[#FAF7F2]"><Terms /><Footer /></div>;
   if (path === '/activar' || path === '/activar-licencia') return <div className="min-h-screen bg-[#FAF7F2]"><ActivateLicense /><Footer /></div>;
+  if (path === '/reset-password') return <ResetPassword />;
 
   if (isPortalOpen) {
     return (
