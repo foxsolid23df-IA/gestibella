@@ -65,6 +65,7 @@ DECLARE
   v_uid uuid := '9857e2ec-5fd8-4f67-b0d5-968c20ef2891';
   v_tenant uuid;
   v_role text;
+  r RECORD;
 BEGIN
   SELECT tenant_id, role INTO v_tenant, v_role
   FROM public.staff WHERE auth_user_id = v_uid LIMIT 1;
@@ -73,7 +74,6 @@ BEGIN
     RAISE NOTICE 'HOOK TEST OK: tenant=% role=%', v_tenant, v_role;
   ELSE
     RAISE WARNING 'HOOK TEST FAIL: no staff with auth_user_id=%', v_uid;
-    -- Show what staff records exist
     FOR r IN SELECT id, email, auth_user_id, tenant_id FROM public.staff LOOP
       RAISE NOTICE 'Staff: id=% email=% auth_uid=% tenant=%', r.id, r.email, r.auth_user_id, r.tenant_id;
     END LOOP;
