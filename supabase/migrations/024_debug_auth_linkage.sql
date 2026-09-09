@@ -35,10 +35,17 @@ LEFT JOIN public.staff s ON LOWER(s.email) = LOWER(au.email)
 ORDER BY au.email;
 
 -- 4) Force-link foxsolid22df@gmail.com (UID: 9857e2ec-5fd8-4f67-b0d5-968c20ef2891)
-UPDATE public.staff
-SET auth_user_id = '9857e2ec-5fd8-4f67-b0d5-968c20ef2891'
-WHERE LOWER(email) = LOWER('foxsolid22df@gmail.com');
-RAISE NOTICE 'Update result: %', SQLERRM;
+DO $$
+BEGIN
+  UPDATE public.staff
+  SET auth_user_id = '9857e2ec-5fd8-4f67-b0d5-968c20ef2891'
+  WHERE LOWER(email) = LOWER('foxsolid22df@gmail.com');
+  IF FOUND THEN
+    RAISE NOTICE 'Linked foxsolid22df@gmail.com to auth_user_id 9857e2ec-5fd8-4f67-b0d5-968c20ef2891';
+  ELSE
+    RAISE WARNING 'No staff record found for foxsolid22df@gmail.com';
+  END IF;
+END $$;
 
 -- 5) Verify the link worked
 SELECT
