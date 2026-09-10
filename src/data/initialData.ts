@@ -444,7 +444,8 @@ export const INITIAL_ANTI_NOSHOW_SETTINGS: AntiNoShowSettings = {
   icsCalendarAttachmentEnabled: true,
   reminderUpsellEnabled: true,
   automatedWaitlistTriggerEnabled: true,
-  reminderNoticeHours: 24
+  reminderNoticeHours: 24,
+  whatsappReminderPhone: ''
 };
 
 export const INITIAL_UPSELL_ITEMS: UpsellItem[] = [

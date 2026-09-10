@@ -93,6 +93,7 @@ export interface AntiNoShowSettings {
   reminderUpsellEnabled: boolean;
   automatedWaitlistTriggerEnabled: boolean;
   reminderNoticeHours: number; // 24
+  whatsappReminderPhone: string; // +52 55 1234 5678
 }
 
 export interface SalonService {

@@ -384,9 +384,16 @@ export const SalonProvider: React.FC<{children:React.ReactNode}> = ({ children }
     addToast('info','Up-Selling Actualizado',`Servicio adicional ${upsell.name} ($${upsell.price}) modificado.`);
   };
   const sendAppointmentReminder = (aptId:string)=>{
-    setAppointmentsList(prev=> prev.map(apt=> apt.id===aptId?{...apt, notificationSent:true}:apt));
     const apt=appointmentsList.find(a=>a.id===aptId);
-    addToast('success','Recordatorio 24h Enviado',`WhatsApp enviado a ${apt?.clientName||'Cliente'}. Incluye botón de .ics.`);
+    if(!apt) return;
+    setAppointmentsList(prev=> prev.map(a=> a.id===aptId?{...a, notificationSent:true}:a));
+    const staff=staffList.find(s=>s.id===apt.staffId);
+    const msg=`¡Hola ${apt.clientName}! 🌿\n\nTe recordamos tu cita en GestiBella:\n\n✂️ Servicio: ${apt.serviceName}\n👤 Especialista: ${staff?.name||'Profesional'}\n📅 Fecha: ${apt.date}\n🕐 Hora: ${apt.time}\n\nTe esperamos. Si necesitas reprogramar, contáctanos.`;
+    const phone=antiNoShowSettings.whatsappReminderPhone.replace(/[^0-9+]/g,'');
+    if(phone){
+      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`,'_blank');
+    }
+    addToast('success','Recordatorio 24h Enviado',phone?`WhatsApp abierto para enviar recordatorio a ${apt.clientName}.`:`Recordatorio marcado. Configura el teléfono WhatsApp en Ajustes para enviar.`);
   };
   const cancelAppointmentAndTriggerWaitlist = (aptId:string)=>{
     const targetApt=appointmentsList.find(a=>a.id===aptId);

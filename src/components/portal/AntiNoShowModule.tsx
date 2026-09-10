@@ -998,6 +998,21 @@ export const AntiNoShowModule: React.FC = () => {
                 className="w-5 h-5 accent-[#BE5A38] rounded cursor-pointer"
               />
             </div>
+
+            {/* WhatsApp Reminder Phone */}
+            <div className="p-4 bg-[#FAF7F2] rounded-2xl border border-[#E8DFD8]">
+              <div>
+                <p className="font-bold text-[#1C1917]">Teléfono WhatsApp para Recordatorios</p>
+                <p className="text-[#78716C] mb-2">Número al que se abrirá WhatsApp con el mensaje prellenado al dar clic en "Recordar" en la Agenda.</p>
+              </div>
+              <input
+                type="tel"
+                placeholder="+52 55 1234 5678"
+                value={antiNoShowSettings.whatsappReminderPhone}
+                onChange={(e) => updateAntiNoShowSettings({ whatsappReminderPhone: e.target.value })}
+                className="w-full bg-white border border-[#E8DFD8] rounded-xl px-3 py-2 text-xs font-bold text-[#1C1917] focus:ring-2 focus:ring-[#BE5A38] focus:outline-none"
+              />
+            </div>
           </div>
         </div>
       )}
