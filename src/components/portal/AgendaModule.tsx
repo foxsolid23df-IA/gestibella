@@ -23,6 +23,7 @@ import {
 import { useSalon } from '../../context/SalonContext';
 import { AppointmentStatus } from '../../types';
 import { downloadIcsFile, DEFAULT_SALON_INFO } from '../../utils/calendarUtils';
+import { getTodayStr, getTomorrowStr, formatDayMonth } from '../../utils/dateUtils';
 
 export const AgendaModule: React.FC = () => {
   const {
@@ -38,7 +39,7 @@ export const AgendaModule: React.FC = () => {
     addToast
   } = useSalon();
 
-  const [selectedDate, setSelectedDate] = useState('2026-08-24');
+  const [selectedDate, setSelectedDate] = useState(getTodayStr());
   const [selectedStaffFilter, setSelectedStaffFilter] = useState<string>('ALL');
   const [viewMode, setViewMode] = useState<'STAFF_COLUMNS' | 'LIST'>('STAFF_COLUMNS');
   const [isNewAptModalOpen, setIsNewAptModalOpen] = useState(false);
@@ -48,7 +49,7 @@ export const AgendaModule: React.FC = () => {
   const [newClientPhone, setNewClientPhone] = useState('');
   const [newStaffId, setNewStaffId] = useState(staffList[0]?.id || 'staff-1');
   const [newServiceId, setNewServiceId] = useState(servicesList[0]?.id || 'srv-1');
-  const [newDate, setNewDate] = useState('2026-08-24');
+  const [newDate, setNewDate] = useState(getTodayStr());
   const [newTime, setNewTime] = useState('11:00');
   const [newNotes, setNewNotes] = useState('');
 
@@ -148,20 +149,20 @@ export const AgendaModule: React.FC = () => {
           {/* Date Picker Buttons */}
           <div className="flex items-center bg-[#FAF7F2] p-1 rounded-2xl border border-[#E8DFD8]">
             <button
-              onClick={() => setSelectedDate('2026-08-24')}
+              onClick={() => setSelectedDate(getTodayStr())}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                selectedDate === '2026-08-24' ? 'bg-[#BE5A38] text-white shadow-xs' : 'text-[#78716C]'
+                selectedDate === getTodayStr() ? 'bg-[#BE5A38] text-white shadow-xs' : 'text-[#78716C]'
               }`}
             >
-              Hoy (24 Ago)
+              Hoy ({formatDayMonth(getTodayStr())})
             </button>
             <button
-              onClick={() => setSelectedDate('2026-08-25')}
+              onClick={() => setSelectedDate(getTomorrowStr())}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                selectedDate === '2026-08-25' ? 'bg-[#BE5A38] text-white shadow-xs' : 'text-[#78716C]'
+                selectedDate === getTomorrowStr() ? 'bg-[#BE5A38] text-white shadow-xs' : 'text-[#78716C]'
               }`}
             >
-              Mañana (25 Ago)
+              Mañana ({formatDayMonth(getTomorrowStr())})
             </button>
           </div>
 

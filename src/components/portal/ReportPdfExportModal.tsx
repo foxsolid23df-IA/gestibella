@@ -24,6 +24,7 @@ import {
   generateInventorySummaryPDF,
   generateExecutiveAnalyticsPDF
 } from '../../utils/pdfExport';
+import { getCurrentMonthYear } from '../../utils/dateUtils';
 
 export type ReportType = 'FINANCIAL_STATEMENT' | 'INVENTORY_SUMMARY' | 'EXECUTIVE_ANALYTICS';
 
@@ -52,7 +53,7 @@ export const ReportPdfExportModal: React.FC<ReportPdfExportModalProps> = ({
 
   const [reportType, setReportType] = useState<ReportType>(initialReportType);
   const [branchScope, setBranchScope] = useState<string>(selectedBranchId || 'ALL');
-  const [dateRange, setDateRange] = useState<string>('Mes en Curso (Agosto 2026)');
+  const [dateRange, setDateRange] = useState<string>(`Mes en Curso (${getCurrentMonthYear()})`);
   const [generatedBy, setGeneratedBy] = useState<string>('Gerencia General');
   const [includeLogo, setIncludeLogo] = useState<boolean>(true);
   const [includeSignatures, setIncludeSignatures] = useState<boolean>(true);
@@ -311,9 +312,9 @@ export const ReportPdfExportModal: React.FC<ReportPdfExportModalProps> = ({
                 onChange={(e) => setDateRange(e.target.value)}
                 className="w-full bg-[#FAF7F2] border border-[#D8C3B5] rounded-xl px-3.5 py-2.5 text-xs text-[#1C1917] focus:ring-2 focus:ring-[#BE5A38] focus:outline-none"
               >
-                <option value="Cierre de Hoy (26 de Agosto)">Cierre de Hoy (26 de Agosto)</option>
+                <option value={`Cierre de Hoy (${getCurrentMonthYear()})`}>Cierre de Hoy ({getCurrentMonthYear()})</option>
                 <option value="Esta Semana">Esta Semana en Curso</option>
-                <option value="Mes en Curso (Agosto 2026)">Mes en Curso (Agosto 2026)</option>
+                <option value={`Mes en Curso (${getCurrentMonthYear()})`}>Mes en Curso ({getCurrentMonthYear()})</option>
                 <option value="Trimestre Q3 2026">Trimestre Q3 2026</option>
                 <option value="Histórico Acumulado Anual 2026">Histórico Acumulado Anual 2026</option>
               </select>

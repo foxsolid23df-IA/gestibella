@@ -16,6 +16,7 @@ import {
   ShoppingBag
 } from 'lucide-react';
 import { useSalon } from '../../context/SalonContext';
+import { getTodayStr } from '../../utils/dateUtils';
 
 export const DashboardModule: React.FC = () => {
   const {
@@ -30,7 +31,7 @@ export const DashboardModule: React.FC = () => {
   } = useSalon();
 
   // Metrics
-  const todayStr = '2026-08-24';
+  const todayStr = getTodayStr();
   const todayAppointments = appointmentsList.filter((a) => a.date === todayStr);
   const inChairApts = todayAppointments.filter((a) => a.status === 'IN_CHAIR');
   const openHoldTickets = ticketsList.filter((t) => t.status === 'HOLD');

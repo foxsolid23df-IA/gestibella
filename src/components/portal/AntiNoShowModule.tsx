@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { useSalon } from '../../context/SalonContext';
 import { downloadIcsFile, generateGoogleCalendarUrl, DEFAULT_SALON_INFO } from '../../utils/calendarUtils';
+import { getTomorrowStr } from '../../utils/dateUtils';
 import { Appointment } from '../../types';
 
 export const AntiNoShowModule: React.FC = () => {
@@ -60,7 +61,7 @@ export const AntiNoShowModule: React.FC = () => {
   const [newWaitlistPhone, setNewWaitlistPhone] = useState('');
   const [newWaitlistServiceId, setNewWaitlistServiceId] = useState(servicesList[0]?.id || '');
   const [newWaitlistStaffId, setNewWaitlistStaffId] = useState('ANY');
-  const [newWaitlistDate, setNewWaitlistDate] = useState('2026-08-25');
+  const [newWaitlistDate, setNewWaitlistDate] = useState(getTomorrowStr());
   const [newWaitlistTimeRange, setNewWaitlistTimeRange] = useState('Tarde (15:00 - 18:00)');
   const [newWaitlistNotes, setNewWaitlistNotes] = useState('');
 
@@ -852,7 +853,7 @@ export const AntiNoShowModule: React.FC = () => {
                                     <Send className="w-3.5 h-3.5" />
                                   </button>
                                   <button
-                                    onClick={() => bookWaitlistToAppointment(entry.id, entry.preferredDate || '2026-08-25', '16:00', entry.preferredStaffId === 'ANY' ? 'staff-1' : entry.preferredStaffId)}
+                                    onClick={() => bookWaitlistToAppointment(entry.id, entry.preferredDate || getTomorrowStr(), '16:00', entry.preferredStaffId === 'ANY' ? 'staff-1' : entry.preferredStaffId)}
                                     title="Asignar Cita Directa"
                                     className="px-2.5 py-1 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 font-bold text-[11px] cursor-pointer"
                                   >
