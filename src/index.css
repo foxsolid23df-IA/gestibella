@@ -42,13 +42,14 @@
   body * {
     visibility: hidden;
   }
-  #printable-receipt, #printable-receipt * {
+  #thermal-receipt, #thermal-receipt * {
     visibility: visible;
   }
-  #printable-receipt {
+  #thermal-receipt {
     position: absolute;
     left: 0;
     top: 0;
     width: 100%;
+    background: white;
   }
 }

@@ -43,6 +43,7 @@ interface SalonContextType {
   transferProductBetweenBranches: (p:{sourceBranchId:string;destinationBranchId:string;productId:string;quantity:number;notes?:string;authorizedBy?:string;})=>Promise<boolean>;
   getProductBranchStock: (productId:string, branchId:string)=>number;
   activeCheckoutTicket: SaleTicket|null; setActiveCheckoutTicket:(t:SaleTicket|null)=>void;
+  activeReceiptTicket: SaleTicket|null; setActiveReceiptTicket:(t:SaleTicket|null)=>void;
   lastCompletedReceipt: SaleTicket|null; setLastCompletedReceipt:(r:SaleTicket|null)=>void;
   selectedFormulaClient: ClientProfile|null; setSelectedFormulaClient:(c:ClientProfile|null)=>void;
   addAppointment: (a:Omit<Appointment,'id'>)=>void;
@@ -156,6 +157,7 @@ export const SalonProvider: React.FC<{children:React.ReactNode}> = ({ children }
   const [selectedBranchId, setSelectedBranchId] = useState('ALL');
   const [branchTransfers, setBranchTransfers] = useState<BranchProductTransfer[]>(INITIAL_BRANCH_TRANSFERS);
   const [activeCheckoutTicket, setActiveCheckoutTicket] = useState<SaleTicket|null>(null);
+  const [activeReceiptTicket, setActiveReceiptTicket] = useState<SaleTicket|null>(null);
   const [lastCompletedReceipt, setLastCompletedReceipt] = useState<SaleTicket|null>(null);
   const [selectedFormulaClient, setSelectedFormulaClient] = useState<ClientProfile|null>(null);
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
@@ -482,7 +484,7 @@ export const SalonProvider: React.FC<{children:React.ReactNode}> = ({ children }
     setClientsList(prev=> prev.map(cli=> cli.id!==target.clientId?cli:{...cli,totalSpent:(cli.totalSpent||0)+totalToPay,visitCount:(cli.visitCount||0)+1,loyaltyPoints:Math.max(0,(cli.loyaltyPoints||0)-pointsToRedeem+earnedPoints),stampCardCount:(cli.stampCardCount||0)+1}));
     target.items.forEach(item=>{ if(item.type==='PRODUCT') setInventoryList(prev=> prev.map(inv=> inv.id===item.itemId?{...inv,currentStock:Math.max(0,inv.currentStock-item.quantity)}:inv)); });
     try{ confetti({particleCount:55,spread:60,origin:{y:0.6}});}catch{}
-    setLastCompletedReceipt(updated); setActiveCheckoutTicket(null);
+    setLastCompletedReceipt(updated); setActiveCheckoutTicket(null); setActiveReceiptTicket(updated);
     addToast('success','¡Cobro Exitoso!',`Ticket #${updated.ticketNumber} liquidado por $${totalToPay.toLocaleString()}. Puntos +${earnedPoints}.`);
   };
   const addSessionPackageToClient=(clientId:string,packageName:string,totalSessions:number,price:number)=>{
@@ -582,7 +584,7 @@ export const SalonProvider: React.FC<{children:React.ReactNode}> = ({ children }
       currentStaff,setCurrentStaff,loginAs,logout,addStaffMember,updateStaffMember,deleteStaffMember,
       staffList,servicesList,inventoryList,clientsList,formulasList,appointmentsList,ticketsList,expensesList,waitlistEntries,upsellItemsList,antiNoShowSettings,receiptConfig,updateReceiptConfig,
       activeSessions,revokeSession,terminateOtherSessions,branches,selectedBranchId,setSelectedBranchId,branchTransfers,transferProductBetweenBranches,getProductBranchStock,
-      activeCheckoutTicket,setActiveCheckoutTicket,lastCompletedReceipt,setLastCompletedReceipt,selectedFormulaClient,setSelectedFormulaClient,
+      activeCheckoutTicket,setActiveCheckoutTicket,activeReceiptTicket,setActiveReceiptTicket,lastCompletedReceipt,setLastCompletedReceipt,selectedFormulaClient,setSelectedFormulaClient,
       addAppointment,updateAppointmentStatus,convertAppointmentToOpenTicket,sendAppointmentReminder,recordAppointmentDeposit,toggleAppointmentUpsell,
       addToWaitlist,cancelAppointmentAndTriggerWaitlist,notifyWaitlistClient,bookWaitlistToAppointment,removeWaitlistEntry,updateAntiNoShowSettings,
       createOpenTicket,addItemToTicket,removeItemFromTicket,checkoutTicket,addSessionPackageToClient,
