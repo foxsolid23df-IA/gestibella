@@ -76,17 +76,26 @@ interface SalonContextType {
 
 const SalonContext = createContext<SalonContextType|undefined>(undefined);
 
-// Helpers to persist to Supabase (fire-and-forget, demo RLS allow all)
-async function sbInsert(table: string, row: any, tenantId: string|null) {
-  if (!isSupabaseConfigured || !supabase || !tenantId) return;
-  try { await supabase.from(table).insert({ ...row, tenant_id: tenantId }); } catch(e){ console.warn('[supabase insert]',table,e); }
+// Helpers to persist to Supabase
+function isUuid(val: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+}
+async function sbInsert(table: string, row: any, tenantId: string|null): Promise<string|null> {
+  if (!isSupabaseConfigured || !supabase || !tenantId) return null;
+  try {
+    const { data, error } = await supabase.from(table).insert({ ...row, tenant_id: tenantId }).select('id').single();
+    if (error) { console.warn('[supabase insert]', table, error); return null; }
+    return data?.id || null;
+  } catch(e) { console.warn('[supabase insert]', table, e); return null; }
 }
 async function sbUpdate(table: string, id: string, patch: any) {
   if (!isSupabaseConfigured || !supabase) return;
+  if (!isUuid(id)) return;
   try { await supabase.from(table).update(patch).eq('id', id); } catch(e){ console.warn('[supabase update]',table,e); }
 }
 async function sbDelete(table: string, id: string) {
   if (!isSupabaseConfigured || !supabase) return;
+  if (!isUuid(id)) return;
   try { await supabase.from(table).delete().eq('id', id); } catch(e){ console.warn('[supabase delete]',table,e); }
 }
 async function sbRpcTransfer(tenantId:string, source:string, dest:string, product:string, qty:number, authBy:string, notes?:string){
@@ -308,11 +317,15 @@ export const SalonProvider: React.FC<{children:React.ReactNode}> = ({ children }
       return;
     }
     if (isExpired) { addToast('error','Licencia vencida','Renueva tu licencia para añadir personal.'); return; }
-    const newId = `staff-${Date.now()}`;
-    const newStaff:StaffMember = { ...data, id:newId, permissions: data.permissions||{ canAccessPOS:true, canAccessFinances:data.role==='ADMIN', canAccessInventory:true, canAccessReports:data.role==='ADMIN'||data.role==='MANAGER', canManageStaff:data.role==='ADMIN' } };
+    const localId = `staff-${Date.now()}`;
+    const newStaff:StaffMember = { ...data, id:localId, permissions: data.permissions||{ canAccessPOS:true, canAccessFinances:data.role==='ADMIN', canAccessInventory:true, canAccessReports:data.role==='ADMIN'||data.role==='MANAGER', canManageStaff:data.role==='ADMIN' } };
     setStaffList(prev=>[...prev,newStaff]);
-    if(isSupabaseEnabled) sbInsert('staff',{ id:newId, name:newStaff.name, email:newStaff.email, phone:newStaff.phone, role:newStaff.role, role_title:newStaff.roleTitle, avatar:newStaff.avatar, service_commission_rate:newStaff.serviceCommissionRate, product_commission_rate:newStaff.productCommissionRate, specialties:newStaff.specialties, color_tag:newStaff.colorTag, is_active:newStaff.isActive, permissions:newStaff.permissions }, tenantId);
     addToast('success','Colaborador Registrado',`Se ha dado de alta a ${newStaff.name} exitosamente.`);
+    if(isSupabaseEnabled){
+      sbInsert('staff',{ name:newStaff.name, email:newStaff.email, phone:newStaff.phone, role:newStaff.role, role_title:newStaff.roleTitle, avatar:newStaff.avatar, service_commission_rate:newStaff.serviceCommissionRate, product_commission_rate:newStaff.productCommissionRate, specialties:newStaff.specialties, color_tag:newStaff.colorTag, is_active:newStaff.isActive, permissions:newStaff.permissions }, tenantId).then(realId=>{
+        if(realId) setStaffList(prev=>prev.map(s=>s.id===localId?{...s,id:realId}:s));
+      });
+    }
   };
   const updateStaffMember = (id:string, updatedData:Partial<StaffMember>)=>{
     setStaffList(prev=> prev.map(s=> s.id===id?{...s,...updatedData}:s));
@@ -339,16 +352,21 @@ export const SalonProvider: React.FC<{children:React.ReactNode}> = ({ children }
   // Business actions — local + supabase persist
   const addAppointment = (newAptData:Omit<Appointment,'id'>)=>{
     if (isExpired) { addToast('error','Licencia vencida','Renueva tu licencia para agendar citas.'); return; }
-    const id=`apt-${Date.now()}`;
+    const localId=`apt-${Date.now()}`;
     let depositRequired=newAptData.depositRequired??false;
     let depositAmount=newAptData.depositAmount;
     if(antiNoShowSettings.depositsEnabled && newAptData.price>=antiNoShowSettings.minimumServicePriceForDeposit && depositRequired===false){
       depositRequired=true; depositAmount=Math.round((newAptData.price*antiNoShowSettings.depositPercentage)/100);
     }
-    const newApt:Appointment={ ...newAptData, id, depositRequired, depositAmount: depositAmount || (depositRequired?Math.round((newAptData.price*antiNoShowSettings.depositPercentage)/100):undefined) };
+    const finalDeposit = depositAmount || (depositRequired?Math.round((newAptData.price*antiNoShowSettings.depositPercentage)/100):undefined);
+    const newApt:Appointment={ ...newAptData, id:localId, depositRequired, depositAmount:finalDeposit };
     setAppointmentsList(prev=>[newApt,...prev]);
-    if(isSupabaseEnabled) sbInsert('appointments',{ id, client_id:newApt.clientId, client_name:newApt.clientName, client_phone:newApt.clientPhone, staff_id:newApt.staffId, service_id:newApt.serviceId, service_name:newApt.serviceName, date:newApt.date, time:newApt.time, duration_minutes:newApt.durationMinutes, price:newApt.price, status:newApt.status, notes:newApt.notes, deposit_required:depositRequired, deposit_amount:depositAmount }, tenantId);
     addToast('success','Cita Agendada',`Cita para ${newApt.clientName} el ${newApt.date} a las ${newApt.time} hrs.`);
+    if(isSupabaseEnabled && isUuid(newApt.staffId) && isUuid(newApt.serviceId)){
+      sbInsert('appointments',{ client_id:newApt.clientId, client_name:newApt.clientName, client_phone:newApt.clientPhone, staff_id:newApt.staffId, service_id:newApt.serviceId, service_name:newApt.serviceName, date:newApt.date, time:newApt.time, duration_minutes:newApt.durationMinutes, price:newApt.price, status:newApt.status, notes:newApt.notes, deposit_required:depositRequired, deposit_amount:finalDeposit }, tenantId).then(realId=>{
+        if(realId) setAppointmentsList(prev=>prev.map(a=>a.id===localId?{...a,id:realId}:a));
+      });
+    }
   };
   const updateAppointmentStatus = (id:string,status:AppointmentStatus)=>{
     setAppointmentsList(prev=> prev.map(apt=> apt.id===id?{...apt,status}:apt));
@@ -386,10 +404,15 @@ export const SalonProvider: React.FC<{children:React.ReactNode}> = ({ children }
     return {waitlistMatches:matches,freedSlot};
   };
   const addToWaitlist = (entryData:Omit<WaitlistEntry,'id'|'createdAt'|'status'>)=>{
-    const newEntry:WaitlistEntry={ ...entryData, id:`wl-${Date.now()}`, status:'WAITING', createdAt:new Date().toLocaleString()};
+    const localId = `wl-${Date.now()}`;
+    const newEntry:WaitlistEntry={ ...entryData, id:localId, status:'WAITING', createdAt:new Date().toLocaleString()};
     setWaitlistEntries(prev=>[newEntry,...prev]);
-    if(isSupabaseEnabled) sbInsert('waitlist_entries',{ id:newEntry.id, client_name:newEntry.clientName, client_phone:newEntry.clientPhone, client_id:newEntry.clientId, service_id:newEntry.serviceId, service_name:newEntry.serviceName, preferred_staff_id:newEntry.preferredStaffId, preferred_date:newEntry.preferredDate, preferred_time_range:newEntry.preferredTimeRange, status:'WAITING', notes:newEntry.notes }, tenantId);
     addToast('success','Cliente Agregado a Lista de Espera',`${newEntry.clientName} registrada.`);
+    if(isSupabaseEnabled && isUuid(newEntry.preferredStaffId)){
+      sbInsert('waitlist_entries',{ client_name:newEntry.clientName, client_phone:newEntry.clientPhone, client_id:newEntry.clientId, service_id:newEntry.serviceId, service_name:newEntry.serviceName, preferred_staff_id:newEntry.preferredStaffId, preferred_date:newEntry.preferredDate, preferred_time_range:newEntry.preferredTimeRange, status:'WAITING', notes:newEntry.notes }, tenantId).then(realId=>{
+        if(realId) setWaitlistEntries(prev=>prev.map(w=>w.id===localId?{...w,id:realId}:w));
+      });
+    }
   };
   const notifyWaitlistClient = (waitlistId:string,customMessage?:string)=>{
     const entry=waitlistEntries.find(w=>w.id===waitlistId); if(!entry) return;
@@ -464,7 +487,7 @@ export const SalonProvider: React.FC<{children:React.ReactNode}> = ({ children }
     setTicketsList(prev=>[pkgTicket,...prev]);
     addToast('success','Paquete Vendido y Asignado',`${packageName} cargado a ${client.name}.`);
   };
-  const addInventoryItem=(itemData:Omit<InventoryItem,'id'>)=>{ const newItem:InventoryItem={...itemData,id:`inv-${Date.now()}`}; setInventoryList(prev=>[newItem,...prev]); if(isSupabaseEnabled) sbInsert('inventory_items',{id:newItem.id, sku:newItem.sku, name:newItem.name, brand:newItem.brand, category:newItem.category, unit:newItem.unit, cost_price:newItem.costPrice, retail_price:newItem.retailPrice, is_retail:newItem.isRetail, location:newItem.location, min_stock:newItem.minStock, max_stock:newItem.maxStock, current_stock:newItem.currentStock}, tenantId); addToast('success','Insumo Registrado',`${newItem.name} guardado.`); };
+  const addInventoryItem=(itemData:Omit<InventoryItem,'id'>)=>{ const localId=`inv-${Date.now()}`; const newItem:InventoryItem={...itemData,id:localId}; setInventoryList(prev=>[newItem,...prev]); addToast('success','Insumo Registrado',`${newItem.name} guardado.`); if(isSupabaseEnabled){ sbInsert('inventory_items',{ sku:newItem.sku, name:newItem.name, brand:newItem.brand, category:newItem.category, unit:newItem.unit, cost_price:newItem.costPrice, retail_price:newItem.retailPrice, is_retail:newItem.isRetail, location:newItem.location, min_stock:newItem.minStock, max_stock:newItem.maxStock, current_stock:newItem.currentStock}, tenantId).then(realId=>{ if(realId) setInventoryList(prev=>prev.map(i=>i.id===localId?{...i,id:realId}:i)); }); } };
   const updateStock=(itemId:string,newStock:number)=>{ setInventoryList(prev=> prev.map(item=> item.id===itemId?{...item,currentStock:Math.max(0,newStock)}:item)); addToast('info','Stock Actualizado','Existencias ajustadas.'); };
   const getProductBranchStock=(productId:string,branchId:string):number=>{
     const item=inventoryList.find(i=>i.id===productId); if(!item) return 0;
@@ -509,10 +532,15 @@ export const SalonProvider: React.FC<{children:React.ReactNode}> = ({ children }
     addToast('info','Consumo Interno Descontado','Insumos rebajados.');
   };
   const addTechnicalFormula=(formulaData:Omit<TechnicalFormula,'id'>)=>{
-    const newFormula:TechnicalFormula={...formulaData,id:`form-${Date.now()}`};
+    const localId = `form-${Date.now()}`;
+    const newFormula:TechnicalFormula={...formulaData,id:localId};
     setFormulasList(prev=>[newFormula,...prev]);
-    if(isSupabaseEnabled) sbInsert('technical_formulas',{id:newFormula.id, client_id:newFormula.clientId, client_name:newFormula.clientName, staff_id:newFormula.staffId, staff_name:newFormula.staffName, service_type:newFormula.serviceType, base_natural:newFormula.baseNatural, porosity:newFormula.porosity, formula_details:newFormula.formulaDetails, exposure_time_minutes:newFormula.exposureTimeMinutes, notes:newFormula.notes}, tenantId);
     addToast('success','Fórmula Técnica Guardada',`Receta archivada para ${formulaData.clientName}.`);
+    if(isSupabaseEnabled && isUuid(newFormula.staffId)){
+      sbInsert('technical_formulas',{ client_id:newFormula.clientId, client_name:newFormula.clientName, staff_id:newFormula.staffId, staff_name:newFormula.staffName, service_type:newFormula.serviceType, base_natural:newFormula.baseNatural, porosity:newFormula.porosity, formula_details:newFormula.formulaDetails, exposure_time_minutes:newFormula.exposureTimeMinutes, notes:newFormula.notes}, tenantId).then(realId=>{
+        if(realId) setFormulasList(prev=>prev.map(f=>f.id===localId?{...f,id:realId}:f));
+      });
+    }
   };
   const addClient=(clientData:Omit<ClientProfile,'id'|'totalSpent'|'visitCount'|'loyaltyPoints'|'stampCardCount'|'activePackages'|'joinedDate'>)=>{
     if (limits.maxClients !== null && clientsList.length >= limits.maxClients) {
@@ -520,15 +548,20 @@ export const SalonProvider: React.FC<{children:React.ReactNode}> = ({ children }
       return;
     }
     if (isExpired) { addToast('error','Licencia vencida','Renueva tu licencia para registrar clientes.'); return; }
-    const newClient:ClientProfile={...clientData,id:`cli-${Date.now()}`,joinedDate:new Date().toISOString().split('T')[0],totalSpent:0,visitCount:0,loyaltyPoints:50,stampCardCount:0,activePackages:[]};
+    const localId = `cli-${Date.now()}`;
+    const newClient:ClientProfile={...clientData,id:localId,joinedDate:new Date().toISOString().split('T')[0],totalSpent:0,visitCount:0,loyaltyPoints:50,stampCardCount:0,activePackages:[]};
     setClientsList(prev=>[newClient,...prev]);
-    if(isSupabaseEnabled) sbInsert('clients',{id:newClient.id, name:newClient.name, phone:newClient.phone, email:newClient.email, avatar:newClient.avatar, loyalty_points:50}, tenantId);
     addToast('success','Cliente Registrado',`${newClient.name} añadido con 50 puntos.`);
+    if(isSupabaseEnabled){
+      sbInsert('clients',{ name:newClient.name, phone:newClient.phone, email:newClient.email, avatar:newClient.avatar, loyalty_points:50}, tenantId).then(realId=>{
+        if(realId) setClientsList(prev=>prev.map(c=>c.id===localId?{...c,id:realId}:c));
+      });
+    }
   };
   const addStampToClient=(clientId:string)=>{ setClientsList(prev=> prev.map(cli=> cli.id!==clientId?cli:{...cli,stampCardCount: (cli.stampCardCount||0)>=6?1:(cli.stampCardCount||0)+1})); addToast('success','Sello Virtual Añadido','¡Sello marcado!'); };
   const redeemStampCardReward=(clientId:string)=>{ setClientsList(prev=> prev.map(cli=> cli.id!==clientId?cli:{...cli,stampCardCount:0})); addToast('success','¡Premio Entregado!','Tarjeta 6 sellos canjeada.'); };
   const usePackageSession=(clientId:string,packageIndex:number)=>{ setClientsList(prev=> prev.map(cli=>{ if(cli.id!==clientId) return cli; const pkgs=[...cli.activePackages]; if(pkgs[packageIndex] && pkgs[packageIndex].usedSessions < pkgs[packageIndex].totalSessions) pkgs[packageIndex]={...pkgs[packageIndex],usedSessions:pkgs[packageIndex].usedSessions+1}; return {...cli,activePackages:pkgs}; })); addToast('info','Sesión Descontada','1 sesión consumida.'); };
-  const addExpense=(expenseData:Omit<ExpenseRecord,'id'>)=>{ const newExp:ExpenseRecord={...expenseData,id:`exp-${Date.now()}`}; setExpensesList(prev=>[newExp,...prev]); if(isSupabaseEnabled) sbInsert('expenses',{id:newExp.id, date:newExp.date, concept:newExp.concept, category:newExp.category, amount:newExp.amount, payment_method:newExp.paymentMethod, receipt_number:newExp.receiptNumber, registered_by:newExp.registeredBy}, tenantId); addToast('warning','Gasto Registrado',`${newExp.concept}: -$${newExp.amount.toLocaleString()}`); };
+  const addExpense=(expenseData:Omit<ExpenseRecord,'id'>)=>{ const localId=`exp-${Date.now()}`; const newExp:ExpenseRecord={...expenseData,id:localId}; setExpensesList(prev=>[newExp,...prev]); addToast('warning','Gasto Registrado',`${newExp.concept}: -$${newExp.amount.toLocaleString()}`); if(isSupabaseEnabled){ sbInsert('expenses',{ date:newExp.date, concept:newExp.concept, category:newExp.category, amount:newExp.amount, payment_method:newExp.paymentMethod, receipt_number:newExp.receiptNumber, registered_by:newExp.registeredBy}, tenantId).then(realId=>{ if(realId) setExpensesList(prev=>prev.map(e=>e.id===localId?{...e,id:realId}:e)); }); } };
   const resetToDemoData=()=>{
     if(window.confirm('¿Restaurar datos de demostración? Se restablecerán a estado inicial (local + Supabase si está conectado).')){
       setStaffList(INITIAL_STAFF); setCurrentStaff(INITIAL_STAFF[0]); setInventoryList(INITIAL_INVENTORY); setClientsList(INITIAL_CLIENTS); setFormulasList(INITIAL_FORMULAS); setAppointmentsList(INITIAL_APPOINTMENTS); setTicketsList(INITIAL_TICKETS); setExpensesList(INITIAL_EXPENSES); setWaitlistEntries(INITIAL_WAITLIST); setBranches([{ id:'branch-1', name:'GestiBella Polanco (Principal)', code:'POL-01', address:'Av. Presidente Masaryk 360, Polanco, CDMX', phone:'+52 55 5540 8890', managerName:'Valentina Vega', activeStaffCount:6, todaySales:14920, monthlyRevenue:384000, status:'ACTIVE', colorTag:'#BE5A38' },{ id:'branch-2', name:'GestiBella Roma Norte', code:'ROM-02', address:'Álvaro Obregón 130, Roma Nte., CDMX', phone:'+52 55 5264 1190', managerName:'Mariana Silva', activeStaffCount:4, todaySales:9850, monthlyRevenue:245000, status:'ACTIVE', colorTag:'#2D2A26' },{ id:'branch-3', name:'GestiBella Satélite', code:'SAT-03', address:'Blvd. Manuel Ávila Camacho 2200, Naucalpan', phone:'+52 55 5373 4410', managerName:'Carlos Mendieta', activeStaffCount:5, todaySales:11200, monthlyRevenue:310000, status:'ACTIVE', colorTag:'#D97706' }]); setBranchTransfers(INITIAL_BRANCH_TRANSFERS);
